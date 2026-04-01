@@ -1,0 +1,1 @@
+export { CooperLogo } from "./CooperLogo";
