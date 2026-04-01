@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, ShieldCheck } from "lucide-react";
-import { openPhantomLogin, connectExtension, isExtensionInstalled } from "@/lib/phantom";
+import { useConnect, AddressType } from "@phantom/react-sdk";
 import { CooperMascot } from "@/components/mascot/CooperMascot";
 
 interface LoginModalProps {
@@ -34,64 +34,55 @@ const PhantomIcon = () => (
   </svg>
 );
 
-type LoginMethod = "google" | "apple" | "phantom";
+type ConnectingProvider = "google" | "apple" | "injected" | null;
 
 export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
-  const [loading, setLoading] = useState<LoginMethod | null>(null);
+  const { connect, isConnecting } = useConnect();
+  const [connecting, setConnecting] = useState<ConnectingProvider>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
 
   if (!open || !mounted) return null;
 
-  async function handleSocial(provider: "google" | "apple") {
-    setLoading(provider);
+  async function handleConnect(provider: "google" | "apple" | "injected") {
+    setConnecting(provider);
     try {
-      await openPhantomLogin(provider);
-      // The Phantom embedded widget handles auth — listen for address via SDK
-      // For now close our modal so Phantom UI is visible
-      onClose();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(null);
-    }
-  }
+      const result = await connect({ provider });
+      const solanaAddr = result.addresses.find(
+        (a) => a.addressType === AddressType.solana
+      )?.address ?? result.addresses[0]?.address;
 
-  async function handlePhantom() {
-    setLoading("phantom");
-    try {
-      if (isExtensionInstalled()) {
-        const address = await connectExtension();
-        onSuccess(address, "phantom");
+      if (solanaAddr) {
+        onSuccess(solanaAddr, provider === "injected" ? "phantom" : provider);
         onClose();
       } else {
-        // Fall back to embedded Phantom
-        await openPhantomLogin();
+        // Social OAuth in progress — SDK handles the redirect/popup.
+        // useAccounts in WalletButton will update automatically on return.
         onClose();
       }
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(null);
+      setConnecting(null);
     }
   }
 
+  const isLoading = (p: ConnectingProvider) => connecting === p || (isConnecting && connecting === p);
+
   const modal = (
-    <div
-      style={{ position: "fixed", inset: 0, zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}
-    >
+    <div style={{ position: "fixed", inset: 0, zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
       {/* Backdrop */}
       <div
-        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", backdropFilter: "blur(4px)" }}
+        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.28)", backdropFilter: "blur(6px)" }}
         onClick={onClose}
       />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-sm overflow-hidden rounded-[2rem] border border-[var(--border)] bg-[var(--card)] shadow-[0_32px_60px_rgba(54,72,42,0.16)]">
+      {/* Modal card */}
+      <div className="relative w-full max-w-sm overflow-hidden rounded-[2rem] border border-[var(--border)] bg-[var(--card)] shadow-[0_32px_64px_rgba(54,72,42,0.18)]">
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 z-10 rounded-full p-1.5 transition-colors hover:bg-black/5"
+          className="absolute right-4 top-4 z-10 rounded-full p-1.5 transition-colors hover:bg-black/6"
         >
           <X className="h-4 w-4 text-[var(--muted)]" />
         </button>
@@ -109,12 +100,13 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
         </div>
 
         <div className="px-6 pb-4 space-y-3">
+          {/* Google */}
           <button
-            onClick={() => handleSocial("google")}
-            disabled={!!loading}
+            onClick={() => handleConnect("google")}
+            disabled={!!connecting}
             className="flex w-full items-center gap-3 rounded-[1.35rem] border border-[var(--border)] bg-white/88 px-4 py-3.5 transition-all hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading === "google" ? (
+            {isLoading("google") ? (
               <Loader2 className="h-[18px] w-[18px] animate-spin text-[var(--muted)]" />
             ) : (
               <GoogleIcon />
@@ -124,17 +116,16 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
             </span>
           </button>
 
+          {/* Apple */}
           <button
-            onClick={() => handleSocial("apple")}
-            disabled={!!loading}
+            onClick={() => handleConnect("apple")}
+            disabled={!!connecting}
             className="flex w-full items-center gap-3 rounded-[1.35rem] border border-[var(--border)] bg-white/88 px-4 py-3.5 transition-all hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading === "apple" ? (
+            {isLoading("apple") ? (
               <Loader2 className="h-[18px] w-[18px] animate-spin text-[var(--muted)]" />
             ) : (
-              <span className="text-[var(--foreground)]">
-                <AppleIcon />
-              </span>
+              <span className="text-[var(--foreground)]"><AppleIcon /></span>
             )}
             <span className="flex-1 text-left text-sm font-semibold text-[var(--foreground)]">
               Continue with Apple
@@ -147,18 +138,19 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
             <div className="h-px flex-1 bg-[var(--border)]" />
           </div>
 
+          {/* Phantom */}
           <button
-            onClick={handlePhantom}
-            disabled={!!loading}
+            onClick={() => handleConnect("injected")}
+            disabled={!!connecting}
             className="flex w-full items-center gap-3 rounded-[1.35rem] border border-orange-200 bg-orange-100/85 px-4 py-3.5 transition-all hover:-translate-y-0.5 hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading === "phantom" ? (
+            {isLoading("injected") ? (
               <Loader2 className="h-[18px] w-[18px] animate-spin text-[var(--accent-strong)]" />
             ) : (
               <PhantomIcon />
             )}
             <span className="flex-1 text-left text-sm font-semibold text-[var(--accent-strong)]">
-              {isExtensionInstalled() ? "Connect Phantom Wallet" : "Continue with Phantom"}
+              Connect Phantom Wallet
             </span>
           </button>
         </div>

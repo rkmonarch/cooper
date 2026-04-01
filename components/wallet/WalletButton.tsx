@@ -1,14 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useAccounts, useDisconnect, AddressType } from "@phantom/react-sdk";
 import { Button } from "@/components/ui/Button";
 import { LoginModal } from "./LoginModal";
-import {
-  getExtensionProvider,
-  disconnectExtension,
-  disconnectEmbedded,
-  getPhantomSDK,
-} from "@/lib/phantom";
 import { shortenAddress } from "@/lib/utils";
 import { LogOut, ChevronDown, Copy, Check } from "lucide-react";
 
@@ -20,51 +15,31 @@ const PhantomIcon = () => (
 );
 
 export function WalletButton() {
-  const [address, setAddress] = useState<string | null>(null);
+  const accounts = useAccounts();
+  const { disconnect } = useDisconnect();
   const [loginOpen, setLoginOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Auto-connect Phantom extension if already trusted
-  useEffect(() => {
-    const provider = getExtensionProvider();
-    if (!provider) return;
-    provider
-      .connect({ onlyIfTrusted: true })
-      .then((resp) => setAddress(resp.publicKey.toString()))
-      .catch(() => {});
-  }, []);
+  // Pull the Solana address from the SDK — automatically updates after any login method
+  const address =
+    accounts?.find((a) => a.addressType === AddressType.solana)?.address ??
+    accounts?.[0]?.address ??
+    null;
 
   // Close dropdown on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node))
         setDropdownOpen(false);
-      }
     }
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Listen for address changes from embedded Phantom SDK
-  useEffect(() => {
-    getPhantomSDK().then((phantom) => {
-      const solana = phantom.solana;
-      if (!solana) return;
-      solana.on?.("connect", (publicKey: { toString(): string }) => {
-        setAddress(publicKey.toString());
-      });
-      solana.on?.("disconnect", () => {
-        setAddress(null);
-      });
-    }).catch(() => {});
-  }, []);
-
   async function handleDisconnect() {
-    await disconnectExtension().catch(() => {});
-    await disconnectEmbedded().catch(() => {});
-    setAddress(null);
+    await disconnect().catch(() => {});
     setDropdownOpen(false);
   }
 
@@ -75,41 +50,42 @@ export function WalletButton() {
     setTimeout(() => setCopied(false), 1500);
   }
 
-  // Not logged in → show Login button
+  // Not connected → Login button
   if (!address) {
     return (
       <>
-        <Button size="sm" onClick={() => setLoginOpen(true)}>
+        <Button
+          size="md"
+          onClick={() => setLoginOpen(true)}
+          className="px-6 py-2.5 text-sm font-bold shadow-[0_8px_22px_rgba(242,141,79,0.30)]"
+        >
           Login
         </Button>
         <LoginModal
           open={loginOpen}
           onClose={() => setLoginOpen(false)}
-          onSuccess={(addr) => {
-            setAddress(addr);
-            setLoginOpen(false);
-          }}
+          onSuccess={() => setLoginOpen(false)}
         />
       </>
     );
   }
 
-  // Logged in → show address chip + dropdown
+  // Connected → address chip + dropdown
   return (
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setDropdownOpen(!dropdownOpen)}
-        className="flex items-center gap-2 rounded-full border border-[var(--border-strong)] bg-white/90 px-3.5 py-2 text-sm font-semibold text-[var(--foreground)] shadow-[0_10px_24px_rgba(54,72,42,0.08)] transition-all hover:-translate-y-0.5 hover:bg-[var(--card)]"
+        className="flex items-center gap-2.5 rounded-full border border-[var(--border-strong)] bg-white px-4 py-2.5 text-sm font-bold text-[var(--foreground)] shadow-[0_4px_18px_rgba(54,72,42,0.10)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(54,72,42,0.14)]"
       >
-        <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-[var(--success)]" />
+        <span className="h-2 w-2 flex-shrink-0 rounded-full bg-[var(--success)] shadow-[0_0_6px_var(--success)]" />
         <PhantomIcon />
         {shortenAddress(address)}
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform text-[var(--muted)] ${dropdownOpen ? "rotate-180" : ""}`} />
       </button>
 
       {dropdownOpen && (
         <div className="absolute right-0 z-50 mt-3 w-56 overflow-hidden rounded-[1.5rem] border border-[var(--border)] bg-[var(--card)] shadow-[0_20px_40px_rgba(54,72,42,0.12)]">
-          <div className="px-4 py-2 flex items-center justify-between gap-2">
+          <div className="px-4 py-3 flex items-center justify-between gap-2">
             <span className="truncate font-mono text-xs text-[var(--muted)]">{address}</span>
             <button
               onClick={handleCopy}

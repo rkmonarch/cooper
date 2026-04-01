@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
-import { CooperLogo } from "@/components/brand";
+import { CooperMascotSmall } from "@/components/mascot/CooperMascot";
+import Providers from "./providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,31 +36,34 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
+        <Providers>
         <Header />
         <main className="flex-1">{children}</main>
         <footer className="mt-auto border-t border-[var(--border)] bg-white/40 backdrop-blur-sm">
-          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-4">
-                <CooperLogo compact iconClassName="h-10 w-10" />
-              </div>
-              <p className="text-xs text-[var(--muted)]">© 2025 Cooper ·</p>
-              <div className="flex flex-wrap items-center gap-4 text-xs text-[var(--muted)]">
-                <span>Powered by</span>
-                <span className="font-semibold text-[var(--accent-strong)]">
-                  x402
+          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <CooperMascotSmall size={36} />
+                <span className="font-black tracking-[-0.05em] text-[var(--foreground)]">
+                  Cooper
                 </span>
-                <span>·</span>
-                <span className="font-semibold text-[var(--success)]">
-                  Phantom
-                </span>
-                <span>·</span>
-                <span className="font-semibold text-sky-600">MoonPay OWS</span>
-                <span>·</span>
               </div>
+              <p className="text-xs text-[var(--muted)]">
+                Built by{" "}
+                <a
+                  href="https://github.com/rkmonarch"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-[var(--foreground)] hover:text-[var(--accent-strong)] transition-colors"
+                >
+                  rkmonarch
+                </a>{" "}
+                · © 2026 Cooper
+              </p>
             </div>
           </div>
         </footer>
+        </Providers>
       </body>
     </html>
   );

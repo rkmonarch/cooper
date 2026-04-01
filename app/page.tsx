@@ -26,11 +26,7 @@ export default function HomePage() {
           {/* ── Left column: text ───────────────────────────────────────────── */}
           <div className="flex flex-col gap-8 py-20 lg:py-0">
             {/* pill */}
-            <div className="flex">
-              <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border-strong)] bg-white/80 px-4 py-1.5 text-[0.7rem] font-black uppercase tracking-[0.22em] text-[var(--accent-strong)] shadow-[0_6px_18px_rgba(242,141,79,0.12)]">
-                OpenWallet Hackathon 2025
-              </span>
-            </div>
+            <div className="flex"></div>
 
             {/* headline — big, stacked, colorful words */}
             <div>
