@@ -7,7 +7,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <PhantomProvider
       config={{
         providers: ["google", "apple", "injected"],
-        appId: process.env.NEXT_PUBLIC_PHANTOM_APP_ID as string,
+        appId: "85254667-f372-4083-b135-ab4d0df0ec04",
+        // process.env.NEXT_PUBLIC_PHANTOM_APP_ID as string,
         addressTypes: [AddressType.solana],
         authOptions: {
           redirectUrl:
