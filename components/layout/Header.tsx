@@ -7,7 +7,8 @@ import { CooperMascotSmall } from "@/components/mascot/CooperMascot";
 import { WalletButton } from "@/components/wallet/WalletButton";
 
 const navLinks = [
-  { href: "/", label: "Marketplace" },
+  { href: "/", label: "Home" },
+  { href: "/listings", label: "Browse" },
   { href: "/create", label: "Sell" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/agent", label: "Agent" },
