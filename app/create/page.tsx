@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check, Plus, Image, FileText, Sparkles, Database, Package,
-  Lock, ChevronRight, Upload, X as XIcon,
+  Lock, ChevronRight, Upload, X as XIcon, Download,
 } from "lucide-react";
 import { useAccounts, AddressType } from "@phantom/react-sdk";
 import { Button } from "@/components/ui/Button";
@@ -80,6 +80,7 @@ interface FormState {
   category: ListingCategory;
   creatorName: string;
   previewUrl: string;
+  allowDownload: boolean;
 
   // AI Image
   aiModel: string;
@@ -115,7 +116,7 @@ interface FormState {
 
 const EMPTY: FormState = {
   title: "", description: "", price: "", category: "prompt",
-  creatorName: "", previewUrl: "",
+  creatorName: "", previewUrl: "", allowDownload: true,
   aiModel: "", resolution: "", styleTags: "", license: "Personal use", fullImageUrl: "",
   topic: "", coveragePeriod: "", pageCount: "", reportFormat: "PDF", reportUrl: "",
   targetModels: "", useCase: "", sampleOutput: "", promptText: "",
@@ -422,7 +423,7 @@ export default function CreatePage() {
     );
   }
 
-  const set = (key: keyof FormState, value: string) =>
+  const set = (key: keyof FormState, value: string | boolean) =>
     setForm((f) => ({ ...f, [key]: value }));
 
   async function handleImageUpload(file: File) {
@@ -461,6 +462,7 @@ export default function CreatePage() {
           creatorName: form.creatorName,
           creatorAddress: address,
           previewUrl: form.previewUrl || null,
+          allowDownload: form.allowDownload,
           content,
         }),
       });
@@ -688,6 +690,34 @@ export default function CreatePage() {
                   </div>
                 )}
               </Field>
+
+              {/* Download permission toggle */}
+              <button
+                type="button"
+                onClick={() => set("allowDownload", !form.allowDownload)}
+                className={`flex w-full items-center gap-3 rounded-[1.1rem] border px-4 py-3.5 text-left transition-all ${
+                  form.allowDownload
+                    ? "border-[var(--success)]/40 bg-[var(--success-soft)]"
+                    : "border-[var(--border)] bg-white/60"
+                }`}
+              >
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+                  form.allowDownload ? "bg-[var(--success)] text-white" : "bg-[var(--border)] text-[var(--muted)]"
+                }`}>
+                  <Download className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-[var(--foreground)]">Allow buyers to download</p>
+                  <p className="text-xs text-[var(--muted)]">
+                    {form.allowDownload
+                      ? "Buyers can download a copy of this content"
+                      : "Content is view-only — no download option shown"}
+                  </p>
+                </div>
+                <div className={`h-5 w-9 rounded-full transition-colors ${form.allowDownload ? "bg-[var(--success)]" : "bg-[var(--border)]"}`}>
+                  <div className={`mt-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${form.allowDownload ? "translate-x-4" : "translate-x-0.5"}`} />
+                </div>
+              </button>
             </div>
 
             {/* Summary card */}

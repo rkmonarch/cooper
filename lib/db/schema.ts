@@ -42,6 +42,7 @@ export const listings = pgTable("listings", {
   contentHash: text("content_hash").notNull(),
   content: text("content").notNull(), // revealed only after payment
   salesCount: integer("sales_count").default(0).notNull(),
+  allowDownload: boolean("allow_download").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

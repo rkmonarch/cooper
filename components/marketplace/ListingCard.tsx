@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { formatUSDC } from "@/lib/utils";
-import { Lock, TrendingUp } from "lucide-react";
+import { Lock, TrendingUp, CheckCircle2 } from "lucide-react";
 import type { Listing } from "@/types";
 import { UnlockModal } from "./UnlockModal";
+import { usePurchases } from "@/lib/use-purchases";
 
 const categoryGradients: Record<string, string> = {
   "ai-image":  "from-lime-100 via-green-50  to-emerald-100",
@@ -31,7 +33,19 @@ interface ListingCardProps {
 }
 
 export function ListingCard({ listing, onUnlock }: ListingCardProps) {
+  const router = useRouter();
+  const { purchasedIds, markPurchased } = usePurchases();
   const [modalOpen, setModalOpen] = useState(false);
+
+  const unlocked = purchasedIds.has(listing.id);
+
+  function handleUnlockSuccess(content: string) {
+    markPurchased(listing.id);
+    setModalOpen(false);
+    onUnlock?.(listing);
+    router.push(`/content/${listing.id}`);
+  }
+
   const gradient = categoryGradients[listing.category] ?? categoryGradients.other;
   const emoji    = categoryEmoji[listing.category] ?? "📦";
 
@@ -39,18 +53,42 @@ export function ListingCard({ listing, onUnlock }: ListingCardProps) {
     <>
       <Card hover className="flex flex-col overflow-hidden">
         {/* Preview */}
-        <div className={`relative flex h-40 items-center justify-center bg-gradient-to-br ${gradient}`}>
+        <div className={`relative flex h-40 items-center justify-center overflow-hidden bg-gradient-to-br ${gradient}`}>
           {listing.previewUrl ? (
-            <img src={listing.previewUrl} alt={listing.title} className="h-full w-full object-cover" />
+            <img
+              src={listing.previewUrl}
+              alt={listing.title}
+              className={`h-full w-full object-cover transition-all duration-500 ${
+                unlocked ? "blur-0 scale-100" : "blur-lg scale-110"
+              }`}
+            />
           ) : (
-            <span className="select-none text-5xl">{emoji}</span>
+            <span className={`select-none text-5xl transition-all duration-500 ${unlocked ? "" : "opacity-40 blur-sm"}`}>
+              {emoji}
+            </span>
           )}
-          {/* Lock hover overlay */}
-          <div className="absolute inset-0 flex items-center justify-center bg-[var(--foreground)]/10 opacity-0 transition-opacity hover:opacity-100">
-            <div className="rounded-full bg-white/80 p-3 shadow-lg">
-              <Lock className="h-5 w-5 text-[var(--foreground)]" />
+
+          {/* Dark gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+
+          {/* Lock overlay */}
+          {!unlocked && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/15">
+              <div className="rounded-full bg-white/25 p-2.5 backdrop-blur-sm ring-1 ring-white/30">
+                <Lock className="h-4 w-4 text-white" />
+              </div>
             </div>
-          </div>
+          )}
+
+          {unlocked && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex items-center gap-1.5 rounded-full bg-[var(--success)]/85 px-2.5 py-1 text-[0.65rem] font-bold text-white backdrop-blur-sm">
+                <CheckCircle2 className="h-3 w-3" />
+                Unlocked
+              </div>
+            </div>
+          )}
+
           <div className="absolute left-3 top-3">
             <Badge category={listing.category} />
           </div>
@@ -77,10 +115,17 @@ export function ListingCard({ listing, onUnlock }: ListingCardProps) {
             <span className="font-black text-[var(--accent-strong)]">
               {formatUSDC(Number(listing.price))}
             </span>
-            <Button size="sm" onClick={() => setModalOpen(true)}>
-              <Lock className="h-3 w-3" />
-              Unlock
-            </Button>
+            {unlocked ? (
+              <Button size="sm" onClick={() => router.push(`/content/${listing.id}`)}>
+                <CheckCircle2 className="h-3 w-3" />
+                View
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => setModalOpen(true)}>
+                <Lock className="h-3 w-3" />
+                Unlock
+              </Button>
+            )}
           </div>
         </div>
       </Card>
@@ -89,7 +134,7 @@ export function ListingCard({ listing, onUnlock }: ListingCardProps) {
         listing={listing}
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSuccess={() => { setModalOpen(false); onUnlock?.(listing); }}
+        onSuccess={handleUnlockSuccess}
       />
     </>
   );

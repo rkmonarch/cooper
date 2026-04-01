@@ -15,6 +15,7 @@ export interface Listing {
   creatorAddress: string;
   creatorName: string;
   contentHash: string; // sha256 of content, used as payment reference
+  allowDownload: boolean;
   createdAt: string;
   salesCount: number;
 }

@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
       creatorAddress: listings.creatorAddress,
       creatorName: listings.creatorName,
       contentHash: listings.contentHash,
+      allowDownload: listings.allowDownload,
       salesCount: listings.salesCount,
       createdAt: listings.createdAt,
     })
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { title, description, price, category, creatorAddress, creatorName, content, previewUrl } =
+  const { title, description, price, category, creatorAddress, creatorName, content, previewUrl, allowDownload } =
     body;
 
   if (!title || !description || !price || !category || !creatorName || !content) {
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
       creatorName,
       contentHash,
       content,
+      allowDownload: allowDownload !== false,
     })
     .returning();
 

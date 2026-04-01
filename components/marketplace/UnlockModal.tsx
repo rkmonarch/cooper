@@ -2,14 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { X, Lock, Unlock, ShieldCheck, Zap, AlertTriangle, CheckCircle2, ExternalLink } from "lucide-react";
-import { useSolana, useAccounts, useAutoConfirm, AddressType } from "@phantom/react-sdk";
+import { useSolana, useAccounts, useAutoConfirm, usePhantom, AddressType } from "@phantom/react-sdk";
 import { NetworkId } from "@phantom/browser-sdk";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { formatUSDC } from "@/lib/utils";
 import { checkPolicy, loadPolicy, recordSpend } from "@/lib/policy";
-import { buildUsdcTransferTx } from "@/lib/solana-payment";
+import { buildUsdcTransferTx, preflightCheck, DEVNET_CONNECTION } from "@/lib/solana-payment";
+import { VersionedTransaction } from "@solana/web3.js";
 import type { Listing } from "@/types";
 
 interface UnlockModalProps {
@@ -22,8 +24,10 @@ interface UnlockModalProps {
 type Step = "policy" | "confirm" | "signing" | "confirming" | "done" | "error";
 
 export function UnlockModal({ listing, open, onClose, onSuccess }: UnlockModalProps) {
+  const router = useRouter();
   const { solana } = useSolana();
   const autoConfirm = useAutoConfirm();
+  const sdk = usePhantom();
   const accounts = useAccounts();
   const buyerAddress =
     accounts?.find((a) => a.addressType === AddressType.solana)?.address ??
@@ -87,9 +91,12 @@ export function UnlockModal({ listing, open, onClose, onSuccess }: UnlockModalPr
 
     const policy = loadPolicy();
     const check = checkPolicy(Number(listing.price), listing.category, policy);
-    // One-tap path: use OWS auto-confirm so Phantom skips its approval popup
     const useAgentWallet = check.allowed && !check.requiresApproval;
     let autoConfirmEnabled = false;
+
+    // Detect embedded vs injected wallet
+    const providerInfo = sdk?.sdk?.getCurrentProviderInfo?.();
+    const isEmbedded = providerInfo?.type === "embedded";
 
     try {
       // 1. Enable OWS auto-confirm for agent-wallet one-tap flow
@@ -102,21 +109,55 @@ export function UnlockModal({ listing, open, onClose, onSuccess }: UnlockModalPr
         }
       }
 
-      // 2. Build USDC devnet transfer to creator's address
+      // 2. For injected wallets, switch to devnet explicitly
+      if (!isEmbedded && (solana as any).switchNetwork) {
+        try {
+          await (solana as any).switchNetwork("devnet");
+        } catch {
+          // switchNetwork may not be available on all providers
+        }
+      }
+
+      // 3. Pre-flight: verify buyer has enough devnet USDC + SOL
+      await preflightCheck(buyerAddress, recipient, Number(listing.price));
+
+      // 4. Build VersionedTransaction (v0) with idempotent ATA creation
       const tx = await buildUsdcTransferTx(
         buyerAddress,
         recipient,
         Number(listing.price),
       );
 
-      // 3. Sign & send via Phantom — auto-confirmed if OWS enabled, approval UI otherwise
-      const { signature } = await solana.signAndSendTransaction(tx);
+      let signature: string;
+
+      if (isEmbedded) {
+        // Embedded wallets only support signAndSendTransaction (not signTransaction).
+        // The embedded wallet is scoped to devnet so it broadcasts there automatically.
+        const result = await solana.signAndSendTransaction(tx);
+        signature = result.signature;
+      } else {
+        // Injected extension: sign without broadcast, then send to devnet ourselves
+        // so the tx always lands on devnet regardless of which network the extension
+        // has selected.
+        const signed = await solana.signTransaction(tx);
+        signature = await DEVNET_CONNECTION.sendRawTransaction(
+          (signed as VersionedTransaction).serialize(),
+          { skipPreflight: false, preflightCommitment: "confirmed" },
+        );
+
+        const { blockhash: confirmBlockhash, lastValidBlockHeight } =
+          await DEVNET_CONNECTION.getLatestBlockhash("confirmed");
+        await DEVNET_CONNECTION.confirmTransaction(
+          { signature, blockhash: confirmBlockhash, lastValidBlockHeight },
+          "confirmed",
+        );
+      }
 
       setTxSig(signature);
       setStep("confirming");
 
-      // 4. Wait ~2s for devnet to confirm
-      await new Promise((r) => setTimeout(r, 2000));
+      // Small buffer for RPC propagation
+      await new Promise((r) => setTimeout(r, 500));
 
       const res = await fetch("/api/purchase", {
         method: "POST",
@@ -137,11 +178,17 @@ export function UnlockModal({ listing, open, onClose, onSuccess }: UnlockModalPr
         return;
       }
 
-      // 5. Record spend in local daily tracker
+      // 6. Record spend in local daily tracker
       recordSpend(Number(listing.price));
 
       setContent(data.content);
       setStep("done");
+
+      // 7. Redirect to the content page after a brief success moment
+      setTimeout(() => {
+        onSuccess(data.content);
+        router.push(`/content/${listing.id}`);
+      }, 1200);
     } catch (err: any) {
       const msg: string = err?.message ?? "Payment failed.";
       setError(
@@ -278,6 +325,11 @@ export function UnlockModal({ listing, open, onClose, onSuccess }: UnlockModalPr
               {(error.includes("daily limit") || error.includes("per-tx") || error.includes("Category")) && (
                 <a href="/dashboard" className="block text-xs font-bold text-red-500 underline underline-offset-2">
                   Update your policy in Dashboard →
+                </a>
+              )}
+              {error.includes("faucet.circle.com") && (
+                <a href="https://faucet.circle.com" target="_blank" rel="noopener noreferrer" className="block text-xs font-bold text-red-500 underline underline-offset-2">
+                  Open faucet.circle.com →
                 </a>
               )}
             </div>

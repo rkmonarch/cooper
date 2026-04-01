@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Lock, CheckCircle2, TrendingUp, Sparkles, FileText, Image, Database, Package } from "lucide-react";
+import { useAccounts, AddressType } from "@phantom/react-sdk";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { formatUSDC } from "@/lib/utils";
 import { UnlockModal } from "./UnlockModal";
+import { usePurchases } from "@/lib/use-purchases";
 import type { Listing } from "@/types";
 
 const categoryGradient: Record<string, string> = {
@@ -25,11 +28,18 @@ const CategoryIcon: Record<string, React.ElementType> = {
 };
 
 export function FeedCard({ listing }: { listing: Listing }) {
+  const router = useRouter();
+  const { purchasedIds, markPurchased } = usePurchases();
   const [modalOpen, setModalOpen] = useState(false);
-  const [unlockedContent, setUnlockedContent] = useState<string | null>(null);
-  const [viewOpen, setViewOpen] = useState(false);
 
-  const unlocked = unlockedContent !== null;
+  const unlocked = purchasedIds.has(listing.id);
+
+  function handleUnlockSuccess(content: string) {
+    markPurchased(listing.id);
+    setModalOpen(false);
+    router.push(`/content/${listing.id}`);
+  }
+
   const gradient = categoryGradient[listing.category] ?? categoryGradient.other;
   const Icon = CategoryIcon[listing.category] ?? Package;
 
@@ -57,10 +67,10 @@ export function FeedCard({ listing }: { listing: Listing }) {
             </div>
           )}
 
-          {/* Dark gradient overlay (always) */}
+          {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
-          {/* Blur noise overlay (locked only) */}
+          {/* Lock overlay (locked only) */}
           {!unlocked && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/20">
               <div className="flex flex-col items-center gap-2">
@@ -84,12 +94,12 @@ export function FeedCard({ listing }: { listing: Listing }) {
             </div>
           )}
 
-          {/* Category badge — top left */}
+          {/* Category badge */}
           <div className="absolute left-3 top-3">
             <Badge category={listing.category} />
           </div>
 
-          {/* Price chip — top right */}
+          {/* Price chip */}
           <div className="absolute right-3 top-3">
             <span className="rounded-full bg-[var(--accent)] px-3 py-1 text-xs font-black text-[var(--accent-foreground)] shadow-[0_4px_12px_rgba(242,141,79,0.35)]">
               {formatUSDC(Number(listing.price))}
@@ -120,7 +130,7 @@ export function FeedCard({ listing }: { listing: Listing }) {
               <Button
                 size="sm"
                 className="w-full"
-                onClick={() => setViewOpen(true)}
+                onClick={() => router.push(`/content/${listing.id}`)}
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 View content
@@ -139,104 +149,12 @@ export function FeedCard({ listing }: { listing: Listing }) {
         </div>
       </article>
 
-      {/* Unlock / pay modal */}
       <UnlockModal
         listing={listing}
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSuccess={(content) => {
-          setUnlockedContent(content);
-          setModalOpen(false);
-        }}
+        onSuccess={handleUnlockSuccess}
       />
-
-      {/* View unlocked content modal */}
-      {viewOpen && unlockedContent && (
-        <ContentViewModal
-          listing={listing}
-          content={unlockedContent}
-          onClose={() => setViewOpen(false)}
-        />
-      )}
     </>
   );
-}
-
-// ── Inline content viewer ─────────────────────────────────────────────────────
-
-import { createPortal } from "react-dom";
-import { X, ExternalLink } from "lucide-react";
-import { useEffect, useState as useStateAlias } from "react";
-
-function ContentViewModal({
-  listing,
-  content,
-  onClose,
-}: {
-  listing: Listing;
-  content: string;
-  onClose: () => void;
-}) {
-  const [mounted, setMounted] = useStateAlias(false);
-  useEffect(() => { setMounted(true); }, []);
-  if (!mounted) return null;
-
-  // Try to detect if content has a URL on its own line
-  const lines = content.split("\n");
-  const urlLine = lines.find((l) => l.trim().startsWith("http"));
-
-  const modal = (
-    <div
-      style={{ position: "fixed", inset: 0, zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}
-    >
-      <div
-        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", backdropFilter: "blur(6px)" }}
-        onClick={onClose}
-      />
-      <div className="relative w-full max-w-lg overflow-hidden rounded-[2rem] border border-[var(--border)] bg-[var(--card)] shadow-[0_40px_80px_rgba(54,72,42,0.22)]">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
-          <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="h-5 w-5 text-[var(--success)]" />
-            <span className="font-black tracking-[-0.03em] text-[var(--foreground)]">
-              {listing.title}
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-xl p-1.5 transition-colors hover:bg-black/5"
-          >
-            <X className="h-4 w-4 text-[var(--muted)]" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="p-6 space-y-4">
-          <div className="max-h-64 overflow-y-auto rounded-[1.2rem] bg-[var(--success-soft)] p-4 font-mono text-sm leading-relaxed text-[var(--foreground)] whitespace-pre-wrap">
-            {content}
-          </div>
-
-          {urlLine && (
-            <a
-              href={urlLine.trim()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full rounded-[1rem] border border-[var(--border)] bg-white/70 px-4 py-3 text-sm font-bold text-[var(--foreground)] transition-colors hover:bg-white"
-            >
-              <ExternalLink className="h-4 w-4" />
-              Open link
-            </a>
-          )}
-        </div>
-
-        <div className="px-6 pb-6">
-          <Button className="w-full" onClick={onClose}>
-            Done
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-
-  return createPortal(modal, document.body);
 }
