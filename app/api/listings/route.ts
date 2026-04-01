@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { title, description, price, category, preatorAddress, creatorName, content, previewUrl } =
+  const { title, description, price, category, creatorAddress, creatorName, content, previewUrl } =
     body;
 
   if (!title || !description || !price || !category || !creatorName || !content) {
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       price: String(price),
       category,
       previewUrl: previewUrl ?? null,
-      creatorAddress: preatorAddress ?? "anonymous",
+      creatorAddress: creatorAddress ?? "anonymous",
       creatorName,
       contentHash,
       content,

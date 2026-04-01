@@ -459,6 +459,7 @@ export default function CreatePage() {
           price: form.price,
           category: form.category,
           creatorName: form.creatorName,
+          creatorAddress: address,
           previewUrl: form.previewUrl || null,
           content,
         }),
