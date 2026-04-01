@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, Info, Save, Settings, ShieldCheck, TrendingUp, Wallet } from "lucide-react";
+import { Clock, Info, Save, Settings, ShieldCheck, TrendingUp, Wallet, Bot, Power } from "lucide-react";
+import { useAutoConfirm } from "@phantom/react-sdk";
+import { NetworkId } from "@phantom/browser-sdk";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -20,6 +22,8 @@ const ALL_CATEGORIES: ListingCategory[] = ["ai-image", "research", "prompt", "da
 export default function DashboardPage() {
   const [policy, setPolicy] = useState<Policy>(DEFAULT_POLICY);
   const [saved, setSaved] = useState(false);
+  const autoConfirm = useAutoConfirm();
+  const agentActive = autoConfirm.status?.enabled ?? false;
 
   function savePolicy() {
     localStorage.setItem("cooper_policy", JSON.stringify(policy));
@@ -168,6 +172,50 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── OWS Agent Wallet ──────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Bot className="h-4 w-4 text-[var(--accent-strong)]" />
+              <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--foreground)]">Agent Wallet (OWS)</h2>
+            </div>
+            <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${agentActive ? "bg-lime-100 text-[var(--success)]" : "bg-stone-100 text-[var(--muted)]"}`}>
+              <Power className="h-3 w-3" />
+              {agentActive ? "Active" : "Inactive"}
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4 text-xs leading-relaxed text-[var(--muted)]">
+            When active, purchases that fall within your spending policy are auto-confirmed on Solana devnet — no Phantom popup needed. Disable at any time to require manual approval for every transaction.
+          </p>
+          <div className="flex gap-3">
+            <Button
+              variant="secondary"
+              className="flex-1"
+              onClick={() => autoConfirm.enable({ chains: [NetworkId.SOLANA_DEVNET] })}
+              loading={autoConfirm.isLoading}
+              disabled={agentActive}
+            >
+              Enable auto-confirm
+            </Button>
+            <Button
+              variant="secondary"
+              className="flex-1 !text-red-500 !border-red-200 hover:!bg-red-50"
+              onClick={() => autoConfirm.disable()}
+              loading={autoConfirm.isLoading}
+              disabled={!agentActive}
+            >
+              Disable
+            </Button>
+          </div>
+          {autoConfirm.error && (
+            <p className="mt-2 text-xs text-red-500">{autoConfirm.error.message}</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -3,15 +3,14 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Lock, Unlock, ShieldCheck, Zap, AlertTriangle, CheckCircle2, ExternalLink } from "lucide-react";
-import { useSolana, useAccounts, AddressType } from "@phantom/react-sdk";
+import { useSolana, useAccounts, useAutoConfirm, AddressType } from "@phantom/react-sdk";
+import { NetworkId } from "@phantom/browser-sdk";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { formatUSDC } from "@/lib/utils";
 import { checkPolicy, loadPolicy, recordSpend } from "@/lib/policy";
 import { buildUsdcTransferTx } from "@/lib/solana-payment";
 import type { Listing } from "@/types";
-
-const RECIPIENT = process.env.NEXT_PUBLIC_PAYMENT_RECIPIENT_ADDRESS ?? "";
 
 interface UnlockModalProps {
   listing: Listing;
@@ -24,6 +23,7 @@ type Step = "policy" | "confirm" | "signing" | "confirming" | "done" | "error";
 
 export function UnlockModal({ listing, open, onClose, onSuccess }: UnlockModalProps) {
   const { solana } = useSolana();
+  const autoConfirm = useAutoConfirm();
   const accounts = useAccounts();
   const buyerAddress =
     accounts?.find((a) => a.addressType === AddressType.solana)?.address ??
@@ -74,8 +74,10 @@ export function UnlockModal({ listing, open, onClose, onSuccess }: UnlockModalPr
       setStep("error");
       return;
     }
-    if (!RECIPIENT) {
-      setError("Payment recipient address not configured (NEXT_PUBLIC_PAYMENT_RECIPIENT_ADDRESS).");
+
+    const recipient = listing.creatorAddress;
+    if (!recipient || recipient === "anonymous") {
+      setError("This listing has no creator address to send payment to.");
       setStep("error");
       return;
     }
@@ -83,24 +85,39 @@ export function UnlockModal({ listing, open, onClose, onSuccess }: UnlockModalPr
     setStep("signing");
     setError(null);
 
+    const policy = loadPolicy();
+    const check = checkPolicy(Number(listing.price), listing.category, policy);
+    // One-tap path: use OWS auto-confirm so Phantom skips its approval popup
+    const useAgentWallet = check.allowed && !check.requiresApproval;
+    let autoConfirmEnabled = false;
+
     try {
-      // 1. Build USDC devnet transfer transaction
+      // 1. Enable OWS auto-confirm for agent-wallet one-tap flow
+      if (useAgentWallet) {
+        try {
+          await autoConfirm.enable({ chains: [NetworkId.SOLANA_DEVNET] });
+          autoConfirmEnabled = true;
+        } catch {
+          // Auto-confirm not available (e.g. injected wallet) — proceed normally
+        }
+      }
+
+      // 2. Build USDC devnet transfer to creator's address
       const tx = await buildUsdcTransferTx(
         buyerAddress,
-        RECIPIENT,
+        recipient,
         Number(listing.price),
       );
 
-      // 2. Phantom signs & broadcasts — triggers approval UI if needed
+      // 3. Sign & send via Phantom — auto-confirmed if OWS enabled, approval UI otherwise
       const { signature } = await solana.signAndSendTransaction(tx);
 
       setTxSig(signature);
       setStep("confirming");
 
-      // 3. Wait ~2s for devnet to process, then verify server-side
+      // 4. Wait ~2s for devnet to confirm
       await new Promise((r) => setTimeout(r, 2000));
 
-      const policy = loadPolicy();
       const res = await fetch("/api/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -108,7 +125,7 @@ export function UnlockModal({ listing, open, onClose, onSuccess }: UnlockModalPr
           listingId: listing.id,
           buyerAddress,
           txSignature: signature,
-          isAgent: false,
+          isAgent: useAgentWallet,
           policySnapshot: policy,
         }),
       });
@@ -120,7 +137,7 @@ export function UnlockModal({ listing, open, onClose, onSuccess }: UnlockModalPr
         return;
       }
 
-      // 4. Record spend in local daily tracker
+      // 5. Record spend in local daily tracker
       recordSpend(Number(listing.price));
 
       setContent(data.content);
@@ -133,6 +150,11 @@ export function UnlockModal({ listing, open, onClose, onSuccess }: UnlockModalPr
           : msg,
       );
       setStep("error");
+    } finally {
+      // Always disable auto-confirm after the transaction
+      if (autoConfirmEnabled) {
+        autoConfirm.disable().catch(() => {});
+      }
     }
   }
 

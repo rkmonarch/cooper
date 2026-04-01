@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useRef } from "react";
 import {
   Check, Plus, Image, FileText, Sparkles, Database, Package,
   Lock, ChevronRight, Upload, X as XIcon,
 } from "lucide-react";
+import { useAccounts, AddressType } from "@phantom/react-sdk";
 import { Button } from "@/components/ui/Button";
 import { CooperMascotSmall } from "@/components/mascot/CooperMascot";
+import { LoginModal } from "@/components/wallet/LoginModal";
 import type { ListingCategory } from "@/types";
 
 // ── Per-category config ───────────────────────────────────────────────────────
@@ -380,6 +381,13 @@ const GATED: Record<ListingCategory, { label: string; placeholder: string; mono?
 
 export default function CreatePage() {
   const router = useRouter();
+  const accounts = useAccounts();
+  const address =
+    accounts?.find((a) => a.addressType === AddressType.solana)?.address ??
+    accounts?.[0]?.address ??
+    null;
+
+  const [loginOpen, setLoginOpen] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -387,6 +395,32 @@ export default function CreatePage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // ── Login gate ────────────────────────────────────────────────────────────
+  if (!address) {
+    return (
+      <div className="flex min-h-[80vh] flex-col items-center justify-center gap-6 px-4 text-center">
+        <CooperMascotSmall size={72} />
+        <div>
+          <h1 className="text-2xl font-black tracking-[-0.05em] text-[var(--foreground)]">
+            Connect to create a listing
+          </h1>
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            You need a wallet to publish content on Cooper.
+          </p>
+        </div>
+        <Button size="lg" onClick={() => setLoginOpen(true)}>
+          <Lock className="h-4 w-4" />
+          Connect Wallet
+        </Button>
+        <LoginModal
+          open={loginOpen}
+          onClose={() => setLoginOpen(false)}
+          onSuccess={() => setLoginOpen(false)}
+        />
+      </div>
+    );
+  }
 
   const set = (key: keyof FormState, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
