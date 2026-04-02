@@ -6,7 +6,7 @@ import {
   Check, Plus, Image, FileText, Sparkles, Database, Package,
   Lock, ChevronRight, Upload, X as XIcon, Download,
 } from "lucide-react";
-import { useAccounts, AddressType } from "@phantom/react-sdk";
+import { useWallet } from "@/lib/use-wallet";
 import { Button } from "@/components/ui/Button";
 import { CooperMascotSmall } from "@/components/mascot/CooperMascot";
 import { LoginModal } from "@/components/wallet/LoginModal";
@@ -382,11 +382,8 @@ const GATED: Record<ListingCategory, { label: string; placeholder: string; mono?
 
 export default function CreatePage() {
   const router = useRouter();
-  const accounts = useAccounts();
-  const address =
-    accounts?.find((a) => a.addressType === AddressType.solana)?.address ??
-    accounts?.[0]?.address ??
-    null;
+  const { session } = useWallet();
+  const address = session?.walletAddress ?? null;
 
   const [loginOpen, setLoginOpen] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
@@ -412,13 +409,9 @@ export default function CreatePage() {
         </div>
         <Button size="lg" onClick={() => setLoginOpen(true)}>
           <Lock className="h-4 w-4" />
-          Connect Wallet
+          Sign in to create
         </Button>
-        <LoginModal
-          open={loginOpen}
-          onClose={() => setLoginOpen(false)}
-          onSuccess={() => setLoginOpen(false)}
-        />
+        <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />
       </div>
     );
   }

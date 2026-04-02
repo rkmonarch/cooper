@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Clock, Info, Save, Settings, ShieldCheck, TrendingUp, Wallet, Bot, Power } from "lucide-react";
-import { useAutoConfirm } from "@phantom/react-sdk";
-import { NetworkId } from "@phantom/browser-sdk";
+import { useState, useEffect } from "react";
+import { Clock, Info, Save, Settings, ShieldCheck, TrendingUp, Wallet, Bot, Copy, Check, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { WalletButton } from "@/components/wallet/WalletButton";
+import { useWallet } from "@/lib/use-wallet";
 import type { ListingCategory, Policy } from "@/types";
 
 const DEFAULT_POLICY: Policy = {
@@ -22,8 +21,24 @@ const ALL_CATEGORIES: ListingCategory[] = ["ai-image", "research", "prompt", "da
 export default function DashboardPage() {
   const [policy, setPolicy] = useState<Policy>(DEFAULT_POLICY);
   const [saved, setSaved] = useState(false);
-  const autoConfirm = useAutoConfirm();
-  const agentActive = autoConfirm.status?.enabled ?? false;
+  const { session } = useWallet();
+  const [balances, setBalances] = useState<{ solBalance: number; usdcBalance: number } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!session?.userId) return;
+    fetch(`/api/wallet?userId=${session.userId}`)
+      .then((r) => r.json())
+      .then((d) => setBalances({ solBalance: d.solBalance, usdcBalance: d.usdcBalance }))
+      .catch(() => {});
+  }, [session?.userId]);
+
+  function handleCopy() {
+    if (!session?.walletAddress) return;
+    navigator.clipboard.writeText(session.walletAddress);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
 
   function savePolicy() {
     localStorage.setItem("cooper_policy", JSON.stringify(policy));
@@ -60,12 +75,44 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="rounded-[1.4rem] border border-orange-200 bg-orange-100/75 p-4">
-                <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent-strong)]">
-                  Phantom Connected
-                </p>
-                <p className="font-mono text-xs text-[var(--muted)]">Connect above to see address</p>
-              </div>
+              {session ? (
+                <>
+                  <div className="overflow-hidden rounded-[1.4rem] border border-[var(--border)] bg-white/70">
+                    <p className="border-b border-[var(--border)] px-4 py-2 text-[0.6rem] font-black uppercase tracking-[0.14em] text-[var(--muted)]">
+                      OWS Agent Wallet · Solana Devnet
+                    </p>
+                    <div className="flex items-center justify-between gap-2 px-4 py-3">
+                      <span className="truncate font-mono text-xs text-[var(--foreground)]">{session.walletAddress}</span>
+                      <button onClick={handleCopy} className="flex-shrink-0 rounded-lg p-1 transition-colors hover:bg-black/5">
+                        {copied ? <Check className="h-3.5 w-3.5 text-[var(--success)]" /> : <Copy className="h-3.5 w-3.5 text-[var(--muted)]" />}
+                      </button>
+                    </div>
+                  </div>
+                  {balances && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-[1.2rem] border border-[var(--border)] bg-white/70 p-3 text-center">
+                        <p className="text-[0.6rem] font-black uppercase tracking-[0.12em] text-[var(--muted)]">SOL</p>
+                        <p className="mt-0.5 text-sm font-black text-[var(--foreground)]">{balances.solBalance.toFixed(4)}</p>
+                      </div>
+                      <div className="rounded-[1.2rem] border border-lime-200 bg-lime-50 p-3 text-center">
+                        <p className="text-[0.6rem] font-black uppercase tracking-[0.12em] text-[var(--success)]">USDC</p>
+                        <p className="mt-0.5 text-sm font-black text-[var(--success)]">{balances.usdcBalance.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  )}
+                  <a
+                    href="https://faucet.circle.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 rounded-[1.2rem] border border-[var(--border)] bg-white/80 px-4 py-2.5 text-xs font-semibold text-[var(--muted)] transition-all hover:text-[var(--foreground)]"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Fund with devnet USDC
+                  </a>
+                </>
+              ) : (
+                <p className="text-sm text-[var(--muted)]">Log in to see your wallet.</p>
+              )}
               <div className="rounded-[1.4rem] border border-lime-200 bg-lime-100/65 p-4">
                 <div className="mb-1 flex items-center gap-1.5">
                   <ShieldCheck className="h-3 w-3 text-[var(--success)]" />
@@ -129,7 +176,7 @@ export default function DashboardPage() {
 
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <label className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">Phantom Approval Above</label>
+                  <label className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">Manual Approval Above</label>
                   <span className="text-xs font-black text-[var(--success)]">{policy.requireApprovalAbove} USDC</span>
                 </div>
                 <input
@@ -142,7 +189,7 @@ export default function DashboardPage() {
                   className="w-full accent-[var(--success)]"
                 />
                 <p className="mt-1 text-xs text-[var(--muted)]">
-                  The agent will request Phantom approval for transactions above this amount.
+                  Transactions above this amount will show a confirmation dialog.
                 </p>
               </div>
 
@@ -181,39 +228,17 @@ export default function DashboardPage() {
               <Bot className="h-4 w-4 text-[var(--accent-strong)]" />
               <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--foreground)]">Agent Wallet (OWS)</h2>
             </div>
-            <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${agentActive ? "bg-lime-100 text-[var(--success)]" : "bg-stone-100 text-[var(--muted)]"}`}>
-              <Power className="h-3 w-3" />
-              {agentActive ? "Active" : "Inactive"}
+            <span className="flex items-center gap-1.5 rounded-full bg-lime-100 px-2.5 py-1 text-xs font-bold text-[var(--success)]">
+              <ShieldCheck className="h-3 w-3" />
+              Active
             </span>
           </div>
         </CardHeader>
         <CardContent>
-          <p className="mb-4 text-xs leading-relaxed text-[var(--muted)]">
-            When active, purchases that fall within your spending policy are auto-confirmed on Solana devnet — no Phantom popup needed. Disable at any time to require manual approval for every transaction.
+          <p className="text-xs leading-relaxed text-[var(--muted)]">
+            Purchases within your spending policy are auto-confirmed by your OWS agent wallet — no browser extension needed. The wallet signs transactions server-side using{" "}
+            <span className="font-semibold text-[var(--foreground)]">@open-wallet-standard/core</span>.
           </p>
-          <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              className="flex-1"
-              onClick={() => autoConfirm.enable({ chains: [NetworkId.SOLANA_DEVNET] })}
-              loading={autoConfirm.isLoading}
-              disabled={agentActive}
-            >
-              Enable auto-confirm
-            </Button>
-            <Button
-              variant="secondary"
-              className="flex-1 !text-red-500 !border-red-200 hover:!bg-red-50"
-              onClick={() => autoConfirm.disable()}
-              loading={autoConfirm.isLoading}
-              disabled={!agentActive}
-            >
-              Disable
-            </Button>
-          </div>
-          {autoConfirm.error && (
-            <p className="mt-2 text-xs text-red-500">{autoConfirm.error.message}</p>
-          )}
         </CardContent>
       </Card>
 

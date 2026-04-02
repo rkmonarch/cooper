@@ -7,7 +7,7 @@ import {
   Image as ImageIcon, FileText, Sparkles, Database, Package,
   Lock, Loader2, ShieldCheck,
 } from "lucide-react";
-import { useAccounts, AddressType } from "@phantom/react-sdk";
+import { useWallet } from "@/lib/use-wallet";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { formatUSDC, shortenAddress } from "@/lib/utils";
@@ -37,11 +37,8 @@ interface ContentData {
 export default function ContentPage() {
   const { listingId } = useParams<{ listingId: string }>();
   const router = useRouter();
-  const accounts = useAccounts();
-  const buyer =
-    accounts?.find((a) => a.addressType === AddressType.solana)?.address ??
-    accounts?.[0]?.address ??
-    null;
+  const { session } = useWallet();
+  const buyer = session?.walletAddress ?? null;
 
   const [data, setData] = useState<ContentData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -309,10 +306,14 @@ function AiImageContent({ parsed, filename, allowDownload }: { parsed: Extract<P
 
 function ResearchContent({ parsed, filename, allowDownload }: { parsed: Extract<ParsedContent, { type: "research" }>; filename: string; allowDownload: boolean }) {
   const url = parsed.reportUrl;
+  // For Google Docs: use /preview. For all other PDFs: proxy through Google Docs viewer
+  // so that sites with X-Frame-Options still render correctly.
   const embedUrl = url.includes("docs.google.com")
     ? url.replace(/\/edit.*$/, "/preview")
-    : /\.pdf($|\?)|\/pdf\b/i.test(url) || url.includes("notion.so")
+    : url.includes("notion.so")
     ? url
+    : /\.pdf($|\?)|\/pdf\b/i.test(url)
+    ? `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`
     : null;
 
   return (
@@ -489,8 +490,11 @@ function CsvViewer({ url }: { url: string }) {
         </div>
       </div>
 
-      {/* Scrollable table */}
-      <div className="overflow-auto" style={{ minHeight: "calc(100vh - 320px)", maxHeight: "calc(100vh - 320px)" }}>
+      {/* Scrollable table — height fits content up to viewport cap */}
+      <div className="overflow-auto" style={{
+        height: Math.min(preview.length * 41 + 44, window?.innerHeight ? window.innerHeight - 280 : 600),
+        maxHeight: "calc(100vh - 280px)",
+      }}>
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="sticky top-0 z-10">

@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**" },
     ],
   },
+  // Native NAPI-RS module — must not be bundled by Turbopack/webpack
+  serverExternalPackages: ["@open-wallet-standard/core"],
 };
 
 export default nextConfig;

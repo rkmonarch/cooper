@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, CheckCircle2, TrendingUp, Sparkles, FileText, Image, Database, Package } from "lucide-react";
-import { useAccounts, AddressType } from "@phantom/react-sdk";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { formatUSDC } from "@/lib/utils";
