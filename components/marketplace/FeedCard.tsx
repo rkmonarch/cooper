@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, CheckCircle2, Sparkles, FileText, ImageIcon, Database, Package, ArrowRight } from "lucide-react";
+import Link from "next/link";
 import { UnlockModal } from "./UnlockModal";
 import { usePurchases } from "@/lib/use-purchases";
 import { formatUSDC } from "@/lib/utils";
@@ -113,7 +114,13 @@ export function FeedCard({ listing }: { listing: Listing }) {
               <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-neutral-100 text-[0.55rem] font-bold text-neutral-500 uppercase">
                 {listing.creatorName?.[0] ?? "?"}
               </div>
-              <span className="truncate text-xs text-neutral-500">{listing.creatorName}</span>
+              <Link
+                href={`/profile/${listing.creatorAddress}`}
+                onClick={(e) => e.stopPropagation()}
+                className="truncate text-xs text-neutral-500 hover:text-neutral-900 hover:underline transition-colors"
+              >
+                {listing.creatorName}
+              </Link>
               <span className="text-neutral-300">·</span>
               <span className="flex-shrink-0 text-xs text-neutral-400">{listing.salesCount} sold</span>
             </div>

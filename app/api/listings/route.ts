@@ -8,15 +8,13 @@ export async function GET(req: NextRequest) {
   const q = searchParams.get("q");
   const maxPrice = searchParams.get("maxPrice");
   const category = searchParams.get("category");
+  const creatorAddress = searchParams.get("creatorAddress");
 
   const filters: SQL[] = [];
 
-  if (q) {
-    filters.push(ilike(listings.title, `%${q}%`));
-  }
-  if (maxPrice) {
-    filters.push(lte(listings.price, maxPrice));
-  }
+  if (q) filters.push(ilike(listings.title, `%${q}%`));
+  if (maxPrice) filters.push(lte(listings.price, maxPrice));
+  if (creatorAddress) filters.push(eq(listings.creatorAddress, creatorAddress));
   if (category) {
     filters.push(eq(listings.category, category));
   }
