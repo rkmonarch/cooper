@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { listings, payments } from "@/lib/db/schema";
+import { listings, payments, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { getOrCreateOwsWallet, solanaAddress, owsSign } from "@/lib/ows";
+import { owsSignByVaultId } from "@/lib/ows";
 import { buildUsdcTransferTx, preflightCheck, DEVNET_CONNECTION } from "@/lib/solana-payment";
 
 export const dynamic = "force-dynamic";
@@ -15,20 +15,30 @@ export const dynamic = "force-dynamic";
  * to avoid BlockhashNotFound simulation errors across devnet RPC nodes.
  */
 export async function POST(req: NextRequest) {
-  const { listingId, userId } = await req.json();
+  const { listingId, userId, walletAddress } = await req.json();
 
   if (!listingId || !userId) {
     return NextResponse.json({ error: "Missing listingId or userId" }, { status: 400 });
   }
 
-  // Resolve buyer's OWS wallet address
-  let buyerAddress: string;
-  try {
-    const wallet = getOrCreateOwsWallet(userId);
-    buyerAddress = solanaAddress(wallet);
-  } catch (err: any) {
-    return NextResponse.json({ error: `OWS wallet error: ${err.message}` }, { status: 500 });
+  if (!walletAddress) {
+    return NextResponse.json({ error: "Missing wallet address. Please sign out and sign in again." }, { status: 400 });
   }
+  const buyerAddress: string = walletAddress;
+
+  // Look up the owsVaultId stored in DB for this wallet address.
+  // This is the exact vault name used when the wallet was originally created —
+  // avoids any userId format mismatch (Google sub vs UUID etc).
+  const [userRow] = await db
+    .select({ owsVaultId: users.owsVaultId })
+    .from(users)
+    .where(eq(users.walletAddress, buyerAddress))
+    .limit(1);
+
+  if (!userRow?.owsVaultId) {
+    return NextResponse.json({ error: "Vault ID not found. Please sign out and sign in again." }, { status: 400 });
+  }
+  const vaultId = userRow.owsVaultId;
 
   // Fetch listing
   const [listing] = await db
@@ -54,8 +64,8 @@ export async function POST(req: NextRequest) {
     // Build unsigned tx (fetches fresh blockhash from DEVNET_CONNECTION)
     const tx = await buildUsdcTransferTx(buyerAddress, recipient, Number(listing.price));
 
-    // OWS signs the tx (injects Ed25519 signature into tx.signatures[0])
-    const signedTx = owsSign(userId, tx);
+    // OWS signs the tx using the exact vault ID stored in DB
+    const signedTx = owsSignByVaultId(vaultId, tx);
 
     // Broadcast via our own connection with skipPreflight=true so we're
     // not subject to which devnet node does the simulation
@@ -64,12 +74,20 @@ export async function POST(req: NextRequest) {
       { skipPreflight: true, preflightCommitment: "confirmed" },
     );
 
-    // Wait for confirmation
+    // Wait for confirmation (30s timeout to avoid hanging forever on devnet)
     const { blockhash, lastValidBlockHeight } = await DEVNET_CONNECTION.getLatestBlockhash("confirmed");
-    await DEVNET_CONNECTION.confirmTransaction(
-      { signature: txSignature, blockhash, lastValidBlockHeight },
-      "confirmed",
-    );
+    const confirmation = await Promise.race([
+      DEVNET_CONNECTION.confirmTransaction(
+        { signature: txSignature, blockhash, lastValidBlockHeight },
+        "confirmed",
+      ),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Transaction confirmation timed out after 30s")), 30_000)
+      ),
+    ]);
+    if ((confirmation as any)?.value?.err) {
+      throw new Error(`Transaction failed on-chain: ${JSON.stringify((confirmation as any).value.err)}`);
+    }
   } catch (err: any) {
     console.error("[pay] sign+send error:", err);
     return NextResponse.json({ error: err.message ?? "Payment failed" }, { status: 500 });

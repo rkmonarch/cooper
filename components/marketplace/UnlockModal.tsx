@@ -78,7 +78,7 @@ export function UnlockModal({ listing, open, onClose, onSuccess }: UnlockModalPr
       const res = await fetch("/api/pay", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ listingId: listing.id, userId: session.userId }),
+        body: JSON.stringify({ listingId: listing.id, userId: session.userId, walletAddress: session.walletAddress }),
       });
 
       const data = await res.json();

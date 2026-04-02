@@ -11,16 +11,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: { strategy: "jwt" },
   callbacks: {
     async jwt({ token, account, profile }) {
-      // On first sign-in, call our wallet API to create/retrieve the OWS wallet
-      if (account && profile) {
+      // Resolve wallet address on first sign-in OR whenever it's missing from the token
+      if ((account && profile) || !token.walletAddress) {
         try {
-          const baseUrl = process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+          const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? "http://localhost:3000";
           const res = await fetch(`${baseUrl}/api/wallet`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               userId: token.sub,
-              displayName: token.name ?? (profile as any).name,
+              displayName: token.name ?? (profile as any)?.name,
+              email: token.email ?? (profile as any)?.email,
             }),
           });
           if (res.ok) {
@@ -28,7 +29,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             token.walletAddress = data.walletAddress;
           }
         } catch {
-          // Non-fatal — wallet can be fetched later
+          // Non-fatal — will retry on next token refresh
         }
       }
       return token;

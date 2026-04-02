@@ -2,28 +2,26 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, CheckCircle2, TrendingUp, Sparkles, FileText, Image, Database, Package } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { formatUSDC } from "@/lib/utils";
+import { Lock, CheckCircle2, Sparkles, FileText, ImageIcon, Database, Package, ArrowRight } from "lucide-react";
 import { UnlockModal } from "./UnlockModal";
 import { usePurchases } from "@/lib/use-purchases";
+import { formatUSDC } from "@/lib/utils";
 import type { Listing } from "@/types";
 
-const categoryGradient: Record<string, string> = {
-  "ai-image": "from-violet-200 via-pink-100 to-fuchsia-200",
-  research:   "from-sky-200 via-cyan-100 to-blue-200",
-  prompt:     "from-amber-200 via-orange-100 to-yellow-200",
-  dataset:    "from-emerald-200 via-teal-100 to-green-200",
-  other:      "from-stone-200 via-zinc-100 to-slate-200",
+const categoryMeta: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
+  "ai-image": { label: "AI Image",  icon: ImageIcon, color: "text-violet-600", bg: "bg-violet-50" },
+  research:   { label: "Research",  icon: FileText,  color: "text-blue-600",   bg: "bg-blue-50"   },
+  prompt:     { label: "Prompt",    icon: Sparkles,  color: "text-amber-600",  bg: "bg-amber-50"  },
+  dataset:    { label: "Dataset",   icon: Database,  color: "text-emerald-600",bg: "bg-emerald-50"},
+  other:      { label: "Other",     icon: Package,   color: "text-slate-500",  bg: "bg-slate-50"  },
 };
 
-const CategoryIcon: Record<string, React.ElementType> = {
-  "ai-image": Image,
-  research:   FileText,
-  prompt:     Sparkles,
-  dataset:    Database,
-  other:      Package,
+const categoryPlaceholder: Record<string, string> = {
+  "ai-image": "bg-gradient-to-br from-violet-100 to-purple-200",
+  research:   "bg-gradient-to-br from-blue-100 to-sky-200",
+  prompt:     "bg-gradient-to-br from-amber-100 to-orange-200",
+  dataset:    "bg-gradient-to-br from-emerald-100 to-teal-200",
+  other:      "bg-gradient-to-br from-slate-100 to-gray-200",
 };
 
 export function FeedCard({ listing }: { listing: Listing }) {
@@ -32,118 +30,94 @@ export function FeedCard({ listing }: { listing: Listing }) {
   const [modalOpen, setModalOpen] = useState(false);
 
   const unlocked = purchasedIds.has(listing.id);
+  const meta = categoryMeta[listing.category] ?? categoryMeta.other;
+  const Icon = meta.icon;
+  const placeholder = categoryPlaceholder[listing.category] ?? categoryPlaceholder.other;
+  const price = Number(listing.price);
 
-  function handleUnlockSuccess(content: string) {
+  function handleUnlockSuccess() {
     markPurchased(listing.id);
     setModalOpen(false);
     router.push(`/content/${listing.id}`);
   }
 
-  const gradient = categoryGradient[listing.category] ?? categoryGradient.other;
-  const Icon = CategoryIcon[listing.category] ?? Package;
-
   return (
     <>
-      <article className="group flex flex-col overflow-hidden rounded-[1.75rem] border border-[var(--border)] bg-[var(--card)] shadow-[0_8px_24px_rgba(54,72,42,0.07)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(54,72,42,0.12)]">
-
-        {/* ── Preview image area ───────────────────────────────────────── */}
-        <div className="relative aspect-[4/3] w-full overflow-hidden">
+      <article
+        className="group flex flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white transition-all duration-200 hover:border-neutral-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] cursor-pointer"
+        onClick={() => !unlocked ? setModalOpen(true) : router.push(`/content/${listing.id}`)}
+      >
+        {/* Image */}
+        <div className="relative aspect-[16/10] w-full overflow-hidden bg-neutral-100">
           {listing.previewUrl ? (
             <img
               src={listing.previewUrl}
               alt={listing.title}
-              className={`h-full w-full object-cover transition-all duration-500 ${
-                unlocked ? "blur-0 scale-100" : "blur-xl scale-110"
+              className={`h-full w-full object-cover transition-all duration-500 group-hover:scale-[1.03] ${
+                unlocked ? "" : "blur-md scale-105"
               }`}
             />
           ) : (
-            <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${gradient}`}>
-              <Icon
-                className={`h-14 w-14 transition-all duration-500 ${
-                  unlocked ? "opacity-60 blur-0" : "opacity-40 blur-sm"
-                } text-[var(--foreground)]`}
-              />
+            <div className={`flex h-full w-full items-center justify-center ${placeholder}`}>
+              <Icon className="h-10 w-10 opacity-30 text-[var(--foreground)]" />
             </div>
           )}
 
-          {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-
-          {/* Lock overlay (locked only) */}
+          {/* Lock pill — bottom center, only when locked */}
           {!unlocked && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-              <div className="flex flex-col items-center gap-2">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm ring-1 ring-white/30">
-                  <Lock className="h-5 w-5 text-white" />
-                </div>
-                <span className="rounded-full bg-black/40 px-3 py-0.5 text-[0.65rem] font-bold uppercase tracking-wider text-white/90 backdrop-blur-sm">
-                  Pay to unlock
-                </span>
-              </div>
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
+              <span className="flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1 text-[0.68rem] font-semibold text-white backdrop-blur-sm">
+                <Lock className="h-3 w-3" />
+                Locked
+              </span>
             </div>
           )}
 
-          {/* Unlocked badge */}
+          {/* Unlocked indicator */}
           {unlocked && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="flex items-center gap-1.5 rounded-full bg-[var(--success)]/90 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Unlocked
-              </div>
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
+              <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/90 px-3 py-1 text-[0.68rem] font-semibold text-white backdrop-blur-sm">
+                <CheckCircle2 className="h-3 w-3" />
+                Purchased
+              </span>
             </div>
           )}
-
-          {/* Category badge */}
-          <div className="absolute left-3 top-3">
-            <Badge category={listing.category} />
-          </div>
-
-          {/* Price chip */}
-          <div className="absolute right-3 top-3">
-            <span className="rounded-full bg-[var(--accent)] px-3 py-1 text-xs font-black text-[var(--accent-foreground)] shadow-[0_4px_12px_rgba(242,141,79,0.35)]">
-              {formatUSDC(Number(listing.price))}
-            </span>
-          </div>
         </div>
 
-        {/* ── Card body ────────────────────────────────────────────────── */}
-        <div className="flex flex-1 flex-col gap-3 p-4">
-          <div>
-            <h3 className="line-clamp-1 text-sm font-black leading-snug tracking-[-0.03em] text-[var(--foreground)]">
+        {/* Body */}
+        <div className="flex flex-1 flex-col p-4 gap-3">
+          {/* Category + price row */}
+          <div className="flex items-center justify-between">
+            <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[0.68rem] font-semibold ${meta.bg} ${meta.color}`}>
+              <Icon className="h-3 w-3" />
+              {meta.label}
+            </span>
+            <span className="text-sm font-bold text-neutral-900">
+              {formatUSDC(price)}
+            </span>
+          </div>
+
+          {/* Title + description */}
+          <div className="flex-1">
+            <h3 className="line-clamp-1 text-sm font-semibold text-neutral-900 leading-snug">
               {listing.title}
             </h3>
-            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--muted)]">
+            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-neutral-500">
               {listing.description}
             </p>
           </div>
 
-          <div className="mt-auto flex items-center gap-2 text-[0.68rem] text-[var(--muted)]">
-            <TrendingUp className="h-3 w-3 flex-shrink-0" />
-            <span>{listing.salesCount} sold</span>
-            <span className="mx-1 opacity-40">·</span>
-            <span className="truncate font-mono">{listing.creatorName}</span>
-          </div>
-
-          <div className="border-t border-[var(--border)] pt-3">
-            {unlocked ? (
-              <Button
-                size="sm"
-                className="w-full"
-                onClick={() => router.push(`/content/${listing.id}`)}
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                View content
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                className="w-full"
-                onClick={() => setModalOpen(true)}
-              >
-                <Lock className="h-3.5 w-3.5" />
-                Unlock · {formatUSDC(Number(listing.price))}
-              </Button>
-            )}
+          {/* Footer */}
+          <div className="flex items-center justify-between pt-2 border-t border-neutral-100">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-neutral-100 text-[0.55rem] font-bold text-neutral-500 uppercase">
+                {listing.creatorName?.[0] ?? "?"}
+              </div>
+              <span className="truncate text-xs text-neutral-500">{listing.creatorName}</span>
+              <span className="text-neutral-300">·</span>
+              <span className="flex-shrink-0 text-xs text-neutral-400">{listing.salesCount} sold</span>
+            </div>
+            <ArrowRight className="h-3.5 w-3.5 flex-shrink-0 text-neutral-300 transition-transform group-hover:translate-x-0.5 group-hover:text-neutral-500" />
           </div>
         </div>
       </article>
