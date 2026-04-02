@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Clock, Info, Save, Settings, ShieldCheck, TrendingUp, Wallet, Bot, Copy, Check, ExternalLink } from "lucide-react";
+import { AtSign, Clock, Info, Save, Settings, ShieldCheck, TrendingUp, Wallet, Bot, Copy, Check, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -24,12 +24,20 @@ export default function DashboardPage() {
   const { session } = useWallet();
   const [balances, setBalances] = useState<{ solBalance: number; usdcBalance: number } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [usernameInput, setUsernameInput] = useState("");
+  const [usernameSaving, setUsernameSaving] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernameSaved, setUsernameSaved] = useState(false);
+
+  useEffect(() => {
+    if (session?.username) setUsernameInput(session.username);
+  }, [session?.username]);
 
   useEffect(() => {
     if (!session?.userId) return;
     fetch(`/api/wallet?userId=${session.userId}`)
       .then((r) => r.json())
-      .then((d) => setBalances({ solBalance: d.solBalance, usdcBalance: d.usdcBalance }))
+      .then((d) => { if (d.solBalance != null) setBalances({ solBalance: d.solBalance, usdcBalance: d.usdcBalance ?? 0 }); })
       .catch(() => {});
   }, [session?.userId]);
 
@@ -38,6 +46,27 @@ export default function DashboardPage() {
     navigator.clipboard.writeText(session.walletAddress);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function saveUsername() {
+    if (!session?.walletAddress) return;
+    setUsernameSaving(true);
+    setUsernameError(null);
+    try {
+      const res = await fetch("/api/wallet", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walletAddress: session.walletAddress, username: usernameInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to update username");
+      setUsernameSaved(true);
+      setTimeout(() => setUsernameSaved(false), 2000);
+    } catch (err: any) {
+      setUsernameError(err.message);
+    } finally {
+      setUsernameSaving(false);
+    }
   }
 
   function savePolicy() {
@@ -219,6 +248,46 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Username ────────────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <AtSign className="h-4 w-4 text-[var(--accent-strong)]" />
+            <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--foreground)]">Username</h2>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {session ? (
+            <div className="space-y-3">
+              <p className="text-xs text-[var(--muted)]">
+                Your public handle on Cooper. Shown on listings and your profile page.
+              </p>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--muted)]">@</span>
+                  <input
+                    type="text"
+                    value={usernameInput}
+                    onChange={(e) => { setUsernameInput(e.target.value); setUsernameError(null); }}
+                    placeholder="your_username"
+                    maxLength={20}
+                    className="w-full rounded-xl border border-[var(--border)] bg-white/70 py-2 pl-7 pr-3 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                  />
+                </div>
+                <Button onClick={saveUsername} variant="secondary" disabled={usernameSaving || !usernameInput}>
+                  {usernameSaved ? <Check className="h-3.5 w-3.5 text-[var(--success)]" /> : <Save className="h-3.5 w-3.5" />}
+                  {usernameSaved ? "Saved!" : usernameSaving ? "Saving…" : "Save"}
+                </Button>
+              </div>
+              {usernameError && <p className="text-xs text-red-500">{usernameError}</p>}
+              <p className="text-xs text-[var(--muted)]">3–20 characters, letters, numbers, _ and - only.</p>
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--muted)]">Log in to set your username.</p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ── OWS Agent Wallet ──────────────────────────────────────────────── */}
       <Card>

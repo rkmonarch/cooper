@@ -429,6 +429,8 @@ export default function CreatePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Upload failed");
       set("previewUrl", data.url);
+      // For AI images, auto-populate the gated full-res URL with the same Cloudinary URL
+      if (form.category === "ai-image") set("fullImageUrl", data.url);
     } catch (e: any) {
       setUploadError(e.message);
     } finally {
@@ -655,34 +657,43 @@ export default function CreatePage() {
                 </p>
               </div>
 
-              <Field label={gated.label}>
-                {gated.textarea ? (
-                  <Textarea
-                    required value={form.category === "prompt" ? form.promptText : form.contentUrl}
-                    onChange={(v) => set(form.category === "prompt" ? "promptText" : "contentUrl", v)}
-                    placeholder={gated.placeholder} rows={8} mono={gated.mono}
-                  />
-                ) : (
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted)]" />
-                    <input
-                      type={form.category === "prompt" ? "text" : "url"}
-                      required
-                      placeholder={gated.placeholder}
-                      value={form.category === "ai-image" ? form.fullImageUrl :
-                             form.category === "research" ? form.reportUrl :
-                             form.category === "dataset" ? form.downloadUrl : form.contentUrl}
-                      onChange={(e) => set(
-                        form.category === "ai-image" ? "fullImageUrl" :
-                        form.category === "research" ? "reportUrl" :
-                        form.category === "dataset" ? "downloadUrl" : "contentUrl",
-                        e.target.value
-                      )}
-                      className={`${inputCls} pl-10`}
+              {form.category === "ai-image" && form.fullImageUrl ? (
+                <div className="flex items-center gap-2.5 rounded-[1.1rem] border border-[var(--success)]/40 bg-[var(--success-soft)] px-4 py-3">
+                  <Check className="h-4 w-4 shrink-0 text-[var(--success)]" />
+                  <p className="text-xs text-[var(--foreground)]">
+                    <span className="font-bold">Full-res image set</span> — using your uploaded Cloudinary URL.
+                  </p>
+                </div>
+              ) : (
+                <Field label={gated.label}>
+                  {gated.textarea ? (
+                    <Textarea
+                      required value={form.category === "prompt" ? form.promptText : form.contentUrl}
+                      onChange={(v) => set(form.category === "prompt" ? "promptText" : "contentUrl", v)}
+                      placeholder={gated.placeholder} rows={8} mono={gated.mono}
                     />
-                  </div>
-                )}
-              </Field>
+                  ) : (
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted)]" />
+                      <input
+                        type={form.category === "prompt" ? "text" : "url"}
+                        required
+                        placeholder={gated.placeholder}
+                        value={form.category === "ai-image" ? form.fullImageUrl :
+                               form.category === "research" ? form.reportUrl :
+                               form.category === "dataset" ? form.downloadUrl : form.contentUrl}
+                        onChange={(e) => set(
+                          form.category === "ai-image" ? "fullImageUrl" :
+                          form.category === "research" ? "reportUrl" :
+                          form.category === "dataset" ? "downloadUrl" : "contentUrl",
+                          e.target.value
+                        )}
+                        className={`${inputCls} pl-10`}
+                      />
+                    </div>
+                  )}
+                </Field>
+              )}
 
               {/* Download permission toggle */}
               <button

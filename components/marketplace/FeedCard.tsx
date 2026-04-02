@@ -115,7 +115,7 @@ export function FeedCard({ listing }: { listing: Listing }) {
                 {listing.creatorName?.[0] ?? "?"}
               </div>
               <Link
-                href={`/profile/${listing.creatorAddress}`}
+                href={`/profile/${listing.creatorUsername ?? listing.creatorAddress}`}
                 onClick={(e) => e.stopPropagation()}
                 className="truncate text-xs text-neutral-500 hover:text-neutral-900 hover:underline transition-colors"
               >

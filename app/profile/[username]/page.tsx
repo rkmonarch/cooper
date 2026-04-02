@@ -10,28 +10,47 @@ function shortenAddress(addr: string) {
   return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
 }
 
+interface ProfileData {
+  user: { walletAddress: string; displayName: string | null; username: string | null };
+  listings: Listing[];
+}
+
 export default function ProfilePage() {
-  const { creatorAddress } = useParams<{ creatorAddress: string }>();
-  const [listings, setListings] = useState<Listing[]>([]);
+  const { username } = useParams<{ username: string }>();
+  const [data, setData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/listings?creatorAddress=${creatorAddress}`)
+    fetch(`/api/profile/${username}`)
       .then((r) => r.json())
-      .then((d) => setListings(d.listings ?? []))
+      .then((d) => setData(d.error ? null : d))
       .finally(() => setLoading(false));
-  }, [creatorAddress]);
+  }, [username]);
 
   function handleCopy() {
-    navigator.clipboard.writeText(creatorAddress);
+    if (!data?.user.walletAddress) return;
+    navigator.clipboard.writeText(data.user.walletAddress);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
 
-  const creatorName = listings[0]?.creatorName ?? shortenAddress(creatorAddress);
+  const listings = data?.listings ?? [];
+  const displayName = data?.user.displayName ?? username;
+  const walletAddress = data?.user.walletAddress ?? "";
   const totalSales = listings.reduce((sum, l) => sum + l.salesCount, 0);
   const totalVolume = listings.reduce((sum, l) => sum + Number(l.price) * l.salesCount, 0);
+
+  if (!loading && !data) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-neutral-50">
+        <div className="text-center">
+          <p className="text-sm font-semibold text-neutral-800">User not found</p>
+          <p className="mt-1 text-xs text-neutral-400">@{username} doesn't exist.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -43,22 +62,25 @@ export default function ProfilePage() {
             {/* Avatar + name */}
             <div className="flex items-center gap-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-900 text-xl font-black text-white">
-                {creatorName[0]?.toUpperCase() ?? "?"}
+                {displayName[0]?.toUpperCase() ?? "?"}
               </div>
               <div>
                 <h1 className="text-2xl font-black tracking-[-0.04em] text-neutral-900">
-                  {creatorName}
+                  {displayName}
                 </h1>
-                <button
-                  onClick={handleCopy}
-                  className="mt-1 flex items-center gap-1.5 text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
-                >
-                  <span className="font-mono">{shortenAddress(creatorAddress)}</span>
-                  {copied
-                    ? <Check className="h-3 w-3 text-emerald-500" />
-                    : <Copy className="h-3 w-3" />
-                  }
-                </button>
+                <p className="text-xs text-neutral-400 mt-0.5">@{username}</p>
+                {walletAddress && (
+                  <button
+                    onClick={handleCopy}
+                    className="mt-1 flex items-center gap-1.5 text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
+                  >
+                    <span className="font-mono">{shortenAddress(walletAddress)}</span>
+                    {copied
+                      ? <Check className="h-3 w-3 text-emerald-500" />
+                      : <Copy className="h-3 w-3" />
+                    }
+                  </button>
+                )}
               </div>
             </div>
 
@@ -74,25 +96,24 @@ export default function ProfilePage() {
                   <p className="text-xs text-neutral-400 mt-0.5">Sales</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-black tracking-[-0.04em] text-neutral-900">
-                    {totalVolume.toFixed(2)}
-                  </p>
+                  <p className="text-2xl font-black tracking-[-0.04em] text-neutral-900">{totalVolume.toFixed(2)}</p>
                   <p className="text-xs text-neutral-400 mt-0.5">USDC earned</p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Explorer link */}
-          <a
-            href={`https://explorer.solana.com/address/${creatorAddress}?cluster=devnet`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
-          >
-            <ExternalLink className="h-3 w-3" />
-            View on Solana Explorer
-          </a>
+          {walletAddress && (
+            <a
+              href={`https://explorer.solana.com/address/${walletAddress}?cluster=devnet`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
+            >
+              <ExternalLink className="h-3 w-3" />
+              View on Solana Explorer
+            </a>
+          )}
         </div>
       </div>
 

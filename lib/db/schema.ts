@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   // MoonPay OWS vault metadata (no keys stored here)
   email: text("email").unique(),
+  username: text("username").unique(),
   owsVaultId: text("ows_vault_id").unique(),
   // Spending policy stored as JSONB
   spendingPolicy: jsonb("spending_policy").$type<{

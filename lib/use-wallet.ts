@@ -6,6 +6,7 @@ export interface WalletSession {
   userId: string;
   walletAddress: string;
   displayName: string;
+  username?: string;
   image?: string;
 }
 
@@ -28,6 +29,7 @@ export function useWallet() {
         userId: user.id ?? user.sub ?? "",
         walletAddress: user.walletAddress,
         displayName: user.name ?? user.email ?? "Anonymous",
+        username: user.username ?? undefined,
         image: user.image ?? undefined,
       }
     : null;

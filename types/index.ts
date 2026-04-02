@@ -14,6 +14,7 @@ export interface Listing {
   previewUrl?: string;
   creatorAddress: string;
   creatorName: string;
+  creatorUsername?: string | null;
   contentHash: string; // sha256 of content, used as payment reference
   allowDownload: boolean;
   createdAt: string;

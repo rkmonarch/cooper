@@ -27,6 +27,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           if (res.ok) {
             const data = await res.json();
             token.walletAddress = data.walletAddress;
+            token.username = data.username;
           }
         } catch {
           // Non-fatal — will retry on next token refresh
@@ -38,6 +39,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       // Expose wallet address + userId in the session
       session.user.id = token.sub ?? "";
       (session.user as any).walletAddress = token.walletAddress as string | undefined;
+      (session.user as any).username = token.username as string | undefined;
       return session;
     },
   },
