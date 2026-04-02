@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { getOrCreateOwsWallet, solanaAddress, walletName } from "@/lib/ows";
+import { walletName } from "@/lib/ows";
+import { remoteGetOrCreateWallet } from "@/lib/signer-client";
 import { DEVNET_CONNECTION, USDC_DEVNET_MINT, USDC_DECIMALS } from "@/lib/solana-payment";
 import { PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
@@ -29,12 +30,15 @@ export async function POST(req: NextRequest) {
         .limit(1);
 
       if (byEmail.length > 0) {
+        const existingVaultId = byEmail[0].owsVaultId ?? vaultId;
+        // Always ensure the signer server has this wallet in its vault.
+        // This handles signer redeployments where the vault is wiped.
+        await remoteGetOrCreateWallet(existingVaultId).catch(() => null);
         await db
           .update(users)
           .set({
             lastSeenAt: new Date(),
             ...(displayName ? { displayName } : {}),
-            // Only backfill owsVaultId if it was never stored
             ...(!byEmail[0].owsVaultId ? { owsVaultId: vaultId } : {}),
           })
           .where(eq(users.id, byEmail[0].id));
@@ -57,9 +61,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ walletAddress: byVaultId[0].walletAddress, userId });
     }
 
-    // ── Step 3: truly new user — create OWS wallet and insert ──
-    const wallet = getOrCreateOwsWallet(userId);
-    const address = solanaAddress(wallet);
+    // ── Step 3: truly new user — create OWS wallet via signer server and insert ──
+    const address = await remoteGetOrCreateWallet(vaultId);
 
     await db.insert(users).values({
       walletAddress: address,

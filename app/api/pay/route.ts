@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { listings, payments, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { owsSignByVaultId } from "@/lib/ows";
+import { remoteSign } from "@/lib/signer-client";
 import { buildUsdcTransferTx, preflightCheck, DEVNET_CONNECTION } from "@/lib/solana-payment";
 
 export const dynamic = "force-dynamic";
@@ -64,8 +64,8 @@ export async function POST(req: NextRequest) {
     // Build unsigned tx (fetches fresh blockhash from DEVNET_CONNECTION)
     const tx = await buildUsdcTransferTx(buyerAddress, recipient, Number(listing.price));
 
-    // OWS signs the tx using the exact vault ID stored in DB
-    const signedTx = owsSignByVaultId(vaultId, tx);
+    // Sign via the remote signer server (ngrok locally, Railway in prod)
+    const signedTx = await remoteSign(vaultId, tx);
 
     // Broadcast via our own connection with skipPreflight=true so we're
     // not subject to which devnet node does the simulation
