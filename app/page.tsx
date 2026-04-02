@@ -170,7 +170,7 @@ export default function HomePage() {
               <ShieldCheck className="h-7 w-7 text-[var(--success)]" />
             </div>
             <h3 className="text-xl font-black tracking-[-0.05em] text-[var(--foreground)]">
-              Keys inside Phantom only
+              Keys inside OWS vault only
             </h3>
             <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
               MoonPay OWS encrypts and seals the wallet vault locally. Your
@@ -211,11 +211,11 @@ export default function HomePage() {
             </h3>
             <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
               Give the agent a goal and a cap. It searches, checks your spending
-              policy, and prompts Phantom biometrics when spend exceeds your
+              policy, and requires your approval when spend exceeds your
               threshold. Human still wins.
             </p>
             <div className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-sky-100/80 px-3 py-1 text-xs font-bold text-sky-700">
-              Phantom approval
+              Policy approval
             </div>
           </div>
         </div>
@@ -266,8 +266,8 @@ export default function HomePage() {
           </p>
           <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4">
             {[
-              { name: "Phantom Embedded Wallet", color: "text-violet-600" },
-              { name: "MoonPay Open Wallet Standard", color: "text-sky-600" },
+              { name: "MoonPay Open Wallet Standard", color: "text-violet-600" },
+              { name: "OWS Agent Vault", color: "text-sky-600" },
               { name: "Solana x402", color: "text-blue-600" },
             ].map(({ name, color }) => (
               <span

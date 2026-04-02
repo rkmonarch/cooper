@@ -34,7 +34,7 @@ export interface Policy {
   dailyLimit: number; // USDC
   maxPerTransaction: number; // USDC
   allowedCategories: ListingCategory[];
-  requireApprovalAbove: number; // USDC – prompt Phantom for anything above this
+  requireApprovalAbove: number; // USDC – prompt for approval above this
 }
 
 export interface AgentLog {

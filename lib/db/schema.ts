@@ -12,7 +12,7 @@ import {
 // ─── Users ────────────────────────────────────────────────────────────────────
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
-  walletAddress: text("wallet_address").notNull().unique(), // Phantom public key
+  walletAddress: text("wallet_address").notNull().unique(), // OWS wallet address
   displayName: text("display_name"),
   avatarUrl: text("avatar_url"),
   // MoonPay OWS vault metadata (no keys stored here)

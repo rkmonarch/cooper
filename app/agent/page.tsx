@@ -136,7 +136,7 @@ export default function AgentPage() {
                 <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--success)]" />
                 <span>
                   Policy rules from your <a href="/dashboard" className="underline">Dashboard</a> are
-                  applied automatically. Keys never leave Phantom.
+                  applied automatically. Keys never leave the OWS vault.
                 </span>
               </div>
 
@@ -229,7 +229,7 @@ export default function AgentPage() {
             <div className="flex items-start gap-2">
               <Bot className="mt-0.5 h-4 w-4 flex-shrink-0 text-sky-600" />
               <span>
-                <strong className="text-[var(--foreground)]">Phantom approval</strong> steps in above
+                <strong className="text-[var(--foreground)]">Policy approval</strong> steps in above
                 your configured threshold.
               </span>
             </div>

@@ -98,7 +98,7 @@ export function checkPolicy(
     };
   }
 
-  // Needs Phantom approval if above threshold
+  // Needs approval if above threshold
   if (price >= p.requireApprovalAbove) {
     return { allowed: true, requiresApproval: true };
   }

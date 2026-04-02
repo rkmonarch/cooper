@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Cooper — Playful Agent Commerce",
   description:
-    "A playful digital marketplace for AI-native goods with x402 payments, Phantom wallets, and agent-driven purchasing.",
+    "A playful digital marketplace for AI-native goods with x402 payments, OWS agent wallets, and agent-driven purchasing.",
   openGraph: {
     title: "Cooper",
     description:

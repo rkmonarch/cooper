@@ -93,10 +93,10 @@ export async function runBuyerAgent(
 
     // Step 3: Human approval if above threshold
     if (price > policy.requireApprovalAbove) {
-      log("approval_request", `Amount ${price} USDC exceeds auto-approve threshold of ${policy.requireApprovalAbove} USDC. Requesting Phantom approval...`);
+      log("approval_request", `Amount ${price} USDC exceeds auto-approve threshold of ${policy.requireApprovalAbove} USDC. Requesting approval...`);
       // In real impl, trigger Phantom biometric approval here
       await sleep(1200);
-      log("approval_request", "Approval granted via Phantom");
+      log("approval_request", "Approval granted via policy");
     }
 
     // Step 4: Payment
