@@ -1,25 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { listings, users } from "@/lib/db/schema";
-import { ilike, lte, eq, and, type SQL } from "drizzle-orm";
+import { ilike, lte, gte, eq, and, asc, desc, type SQL } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q");
-  const maxPrice = searchParams.get("maxPrice");
   const category = searchParams.get("category");
   const creatorAddress = searchParams.get("creatorAddress");
+  const minPrice = searchParams.get("minPrice");
+  const maxPrice = searchParams.get("maxPrice");
+  const sort = searchParams.get("sort"); // "most_bought" | "least_bought" | "price_asc" | "price_desc" | default newest
 
   const filters: SQL[] = [];
 
   if (q) filters.push(ilike(listings.title, `%${q}%`));
+  if (minPrice) filters.push(gte(listings.price, minPrice));
   if (maxPrice) filters.push(lte(listings.price, maxPrice));
   if (creatorAddress) filters.push(eq(listings.creatorAddress, creatorAddress));
-  if (category) {
-    filters.push(eq(listings.category, category));
-  }
+  if (category) filters.push(eq(listings.category, category));
 
-  // Try with username join first; fall back to plain query if column doesn't exist yet
+  const orderBy =
+    sort === "most_bought"  ? desc(listings.salesCount) :
+    sort === "least_bought" ? asc(listings.salesCount)  :
+    sort === "price_asc"    ? asc(listings.price)        :
+    sort === "price_desc"   ? desc(listings.price)       :
+    desc(listings.createdAt);
+
   try {
     const rows = await db
       .select({
@@ -40,10 +47,9 @@ export async function GET(req: NextRequest) {
       .from(listings)
       .leftJoin(users, eq(listings.creatorAddress, users.walletAddress))
       .where(filters.length ? and(...filters) : undefined)
-      .orderBy(listings.createdAt);
+      .orderBy(orderBy);
     return NextResponse.json({ listings: rows });
   } catch {
-    // Fallback: username column may not exist yet in DB
     const rows = await db
       .select({
         id: listings.id,
@@ -61,7 +67,7 @@ export async function GET(req: NextRequest) {
       })
       .from(listings)
       .where(filters.length ? and(...filters) : undefined)
-      .orderBy(listings.createdAt);
+      .orderBy(orderBy);
     return NextResponse.json({ listings: rows });
   }
 }

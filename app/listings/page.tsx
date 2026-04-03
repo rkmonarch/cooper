@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Sparkles, FileText, ImageIcon, Database, Package, Globe } from "lucide-react";
+import { Sparkles, FileText, ImageIcon, Database, Package, Globe, TrendingUp, TrendingDown, ArrowUpDown, X } from "lucide-react";
 import { FeedCard } from "@/components/marketplace/FeedCard";
 import type { Listing, ListingCategory } from "@/types";
 
@@ -18,14 +18,32 @@ const CATEGORIES: {
   { value: "other",    label: "Other",     icon: Package   },
 ];
 
+type SortOption = "newest" | "most_bought" | "least_bought" | "price_asc" | "price_desc";
+
+const SORT_OPTIONS: { value: SortOption; label: string; icon: React.ElementType }[] = [
+  { value: "newest",      label: "Newest",       icon: ArrowUpDown  },
+  { value: "most_bought", label: "Most bought",  icon: TrendingUp   },
+  { value: "least_bought",label: "Least bought", icon: TrendingDown },
+  { value: "price_asc",   label: "Price: low",   icon: ArrowUpDown  },
+  { value: "price_desc",  label: "Price: high",  icon: ArrowUpDown  },
+];
+
 export default function ListingsPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<ListingCategory | "all">("all");
+  const [sort, setSort] = useState<SortOption>("newest");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [showPriceFilter, setShowPriceFilter] = useState(false);
+
   const fetchListings = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (activeCategory !== "all") params.set("category", activeCategory);
+    if (sort !== "newest") params.set("sort", sort);
+    if (minPrice) params.set("minPrice", minPrice);
+    if (maxPrice) params.set("maxPrice", maxPrice);
     try {
       const res = await fetch(`/api/listings?${params}`);
       const data = await res.json();
@@ -35,11 +53,17 @@ export default function ListingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeCategory]);
+  }, [activeCategory, sort, minPrice, maxPrice]);
 
   useEffect(() => { fetchListings(); }, [fetchListings]);
 
-  const filtered = listings;
+  const hasPriceFilter = minPrice || maxPrice;
+
+  function clearPriceFilter() {
+    setMinPrice("");
+    setMaxPrice("");
+    setShowPriceFilter(false);
+  }
 
   return (
     <div className="min-h-screen">
@@ -63,10 +87,12 @@ export default function ListingsPage() {
 
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
 
-        {/* ── Filter pills ──────────────────────────────────────────────────── */}
+        {/* ── Filter bar ────────────────────────────────────────────────────── */}
         <div className="sticky top-[68px] z-10 -mx-4 sm:-mx-6 lg:-mx-8 border-b border-[var(--border)]
                         bg-[var(--background)]/95 backdrop-blur-xl px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-2 overflow-x-auto py-3 scrollbar-hide">
+          <div className="flex items-center gap-2 overflow-x-auto py-3 scrollbar-hide">
+
+            {/* Category pills */}
             {CATEGORIES.map((cat) => {
               const active = activeCategory === cat.value;
               const CatIcon = cat.icon;
@@ -86,14 +112,99 @@ export default function ListingsPage() {
                 </button>
               );
             })}
+
+            {/* Divider */}
+            <div className="mx-1 h-5 w-px shrink-0 bg-neutral-200" />
+
+            {/* Sort pills */}
+            {SORT_OPTIONS.map((opt) => {
+              const active = sort === opt.value;
+              const SortIcon = opt.icon;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setSort(opt.value)}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold
+                              transition-all duration-150
+                              ${active
+                                ? "bg-[var(--accent-strong)] text-white shadow-sm"
+                                : "bg-white text-neutral-500 hover:bg-neutral-100 border border-neutral-200"
+                              }`}
+                >
+                  <SortIcon className="h-3 w-3" />
+                  {opt.label}
+                </button>
+              );
+            })}
+
+            {/* Divider */}
+            <div className="mx-1 h-5 w-px shrink-0 bg-neutral-200" />
+
+            {/* Price range toggle */}
+            <button
+              onClick={() => setShowPriceFilter((v) => !v)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold
+                          transition-all duration-150
+                          ${hasPriceFilter
+                            ? "bg-[var(--accent-strong)] text-white shadow-sm"
+                            : "bg-white text-neutral-500 hover:bg-neutral-100 border border-neutral-200"
+                          }`}
+            >
+              $ Price range
+              {hasPriceFilter && (
+                <span
+                  className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-white/30 hover:bg-white/50"
+                  onClick={(e) => { e.stopPropagation(); clearPriceFilter(); }}
+                >
+                  <X className="h-2.5 w-2.5" />
+                </span>
+              )}
+            </button>
           </div>
+
+          {/* Price range inputs — inline below filter bar */}
+          {showPriceFilter && (
+            <div className="flex items-center gap-3 pb-3">
+              <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs shadow-sm">
+                <span className="text-neutral-400 font-medium">Min $</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={minPrice}
+                  onChange={(e) => setMinPrice(e.target.value)}
+                  className="w-16 bg-transparent text-neutral-900 outline-none placeholder:text-neutral-300"
+                />
+              </div>
+              <span className="text-xs text-neutral-400">to</span>
+              <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs shadow-sm">
+                <span className="text-neutral-400 font-medium">Max $</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="100.00"
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(e.target.value)}
+                  className="w-16 bg-transparent text-neutral-900 outline-none placeholder:text-neutral-300"
+                />
+              </div>
+              {hasPriceFilter && (
+                <button onClick={clearPriceFilter} className="text-xs text-neutral-400 hover:text-neutral-700 transition-colors">
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── Results count ─────────────────────────────────────────────────── */}
         {!loading && (
           <p className="mt-6 mb-4 text-xs text-neutral-400">
-            {filtered.length} listing{filtered.length !== 1 ? "s" : ""}
+            {listings.length} listing{listings.length !== 1 ? "s" : ""}
             {activeCategory !== "all" && ` · ${CATEGORIES.find((c) => c.value === activeCategory)?.label}`}
+            {hasPriceFilter && ` · $${minPrice || "0"} – $${maxPrice || "∞"}`}
           </p>
         )}
 
@@ -104,11 +215,11 @@ export default function ListingsPage() {
               <SkeletonCard key={i} />
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : listings.length === 0 ? (
           <EmptyState category={activeCategory} hasQuery={false} />
         ) : (
           <div className="grid grid-cols-1 gap-6 pb-24 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((listing) => (
+            {listings.map((listing) => (
               <FeedCard key={listing.id} listing={listing} />
             ))}
           </div>
