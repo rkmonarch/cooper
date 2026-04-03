@@ -5,8 +5,8 @@ import { eq, or } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: NextRequest, { params }: { params: { username: string } }) {
-  const { username } = params;
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ username: string }> }) {
+  const { username } = await params;
 
   // Accept both username and wallet address so old links don't break
   const [user] = await db
