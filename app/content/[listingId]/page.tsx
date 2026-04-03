@@ -305,36 +305,106 @@ function AiImageContent({ parsed, filename, allowDownload }: { parsed: Extract<P
 }
 
 function ResearchContent({ parsed, filename, allowDownload }: { parsed: Extract<ParsedContent, { type: "research" }>; filename: string; allowDownload: boolean }) {
-  const url = parsed.reportUrl;
-  // For Google Docs: use /preview. For all other PDFs: proxy through Google Docs viewer
-  // so that sites with X-Frame-Options still render correctly.
-  const embedUrl = url.includes("docs.google.com")
-    ? url.replace(/\/edit.*$/, "/preview")
-    : url.includes("notion.so")
-    ? url
-    : /\.pdf($|\?)|\/pdf\b/i.test(url)
-    ? `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`
-    : null;
-
   return (
     <ContentLayout
       meta={[]}
-      viewer={
-        embedUrl ? (
-          <div className="overflow-hidden rounded-[1.75rem] border border-[var(--border)] shadow-sm">
-            <iframe src={embedUrl} className="h-[75vh] w-full" title="Report" />
-          </div>
-        ) : (
-          <div className="rounded-[1.4rem] border border-[var(--border)] bg-white/70 p-6">
-            <p className="text-sm font-semibold text-[var(--foreground)]">Report available at:</p>
-            <a href={url} target="_blank" rel="noopener noreferrer"
-              className="mt-1 break-all text-sm text-[var(--success)] underline underline-offset-2">
-              {url}
-            </a>
-          </div>
-        )
-      }
+      viewer={<UrlViewer url={parsed.reportUrl} />}
     />
+  );
+}
+
+// ── URL Viewer ────────────────────────────────────────────────────────────────
+// Embeds what it can; shows a styled fallback card for sites that block iframes.
+
+function getEmbedStrategy(url: string): { type: "embed"; src: string } | { type: "fallback" } {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+
+    // Google Docs / Sheets / Slides — use /preview
+    if (host === "docs.google.com") {
+      return { type: "embed", src: url.replace(/\/edit.*$/, "/preview") };
+    }
+    // Notion public pages
+    if (host === "notion.so" || host.endsWith(".notion.so") || host === "notion.site" || host.endsWith(".notion.site")) {
+      return { type: "embed", src: url };
+    }
+    // PDF — proxy via Google Docs viewer
+    if (/\.pdf($|\?)/i.test(u.pathname) || /\/pdf\b/i.test(url)) {
+      return { type: "embed", src: `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true` };
+    }
+    // Sites known to block iframes — show fallback
+    if (["medium.com", "substack.com", "twitter.com", "x.com", "github.com"].some((d) => host === d || host.endsWith(`.${d}`))) {
+      return { type: "fallback" };
+    }
+    // Everything else: try iframe
+    return { type: "embed", src: url };
+  } catch {
+    return { type: "fallback" };
+  }
+}
+
+function UrlViewer({ url }: { url: string }) {
+  const [failed, setFailed] = useState(false);
+  const strategy = getEmbedStrategy(url);
+
+  let hostname = "";
+  try { hostname = new URL(url).hostname.replace(/^www\./, ""); } catch {}
+
+  const faviconUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+
+  if (strategy.type === "embed" && !failed) {
+    return (
+      <div className="overflow-hidden rounded-[1.75rem] border border-[var(--border)] shadow-sm">
+        {/* Toolbar */}
+        <div className="flex items-center gap-3 border-b border-[var(--border)] bg-white/90 px-4 py-2.5 backdrop-blur-sm">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={faviconUrl} alt="" className="h-4 w-4 rounded-sm" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          <span className="flex-1 truncate font-mono text-xs text-[var(--muted)]">{url}</span>
+          <a href={url} target="_blank" rel="noopener noreferrer"
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border)] bg-white px-2.5 py-1 text-xs font-semibold text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
+            <ExternalLink className="h-3 w-3" />
+            Open
+          </a>
+        </div>
+        <iframe
+          src={strategy.src}
+          className="h-[75vh] w-full"
+          title="Content viewer"
+          onError={() => setFailed(true)}
+          onLoad={(e) => {
+            // Detect if page blocked the frame by checking if content loaded
+            try {
+              const doc = (e.target as HTMLIFrameElement).contentDocument;
+              if (doc && doc.title === "") setFailed(true);
+            } catch { /* cross-origin — that's fine, it loaded */ }
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Fallback card for Medium, Substack, etc.
+  return (
+    <div className="rounded-[1.75rem] border border-[var(--border)] bg-white/70 p-8 flex flex-col items-center gap-5 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--border)] bg-white shadow-sm">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={faviconUrl} alt={hostname} className="h-8 w-8 rounded" onError={(e) => { (e.target as HTMLImageElement).src = ""; }} />
+      </div>
+      <div>
+        <p className="font-bold text-[var(--foreground)]">{hostname}</p>
+        <p className="mt-1 text-sm text-[var(--muted)] max-w-sm break-all">{url}</p>
+      </div>
+      <p className="text-xs text-[var(--muted)]">
+        This site doesn't allow embedding — click below to read it directly.
+      </p>
+      <a href={url} target="_blank" rel="noopener noreferrer">
+        <Button>
+          <ExternalLink className="h-4 w-4" />
+          Open {hostname}
+        </Button>
+      </a>
+    </div>
   );
 }
 
