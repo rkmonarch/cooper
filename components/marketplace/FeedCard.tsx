@@ -2,27 +2,74 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, CheckCircle2, Sparkles, FileText, ImageIcon, Database, Package, ShoppingCart } from "lucide-react";
-import Link from "next/link";
+import {
+  Lock,
+  CheckCircle2,
+  Sparkles,
+  FileText,
+  ImageIcon,
+  Database,
+  Package,
+  ShoppingCart,
+} from "lucide-react";
 import { UnlockModal } from "./UnlockModal";
 import { usePurchases } from "@/lib/use-purchases";
 import { formatUSDC } from "@/lib/utils";
 import type { Listing } from "@/types";
 
-const categoryMeta: Record<string, { label: string; icon: React.ElementType; color: string; bg: string; accent: string }> = {
-  "ai-image": { label: "AI Image",  icon: ImageIcon, color: "text-violet-700", bg: "bg-violet-100",  accent: "from-violet-500 to-purple-600"  },
-  research:   { label: "Research",  icon: FileText,  color: "text-blue-700",   bg: "bg-blue-100",    accent: "from-blue-500 to-cyan-600"       },
-  prompt:     { label: "Prompt",    icon: Sparkles,  color: "text-amber-700",  bg: "bg-amber-100",   accent: "from-amber-500 to-orange-500"    },
-  dataset:    { label: "Dataset",   icon: Database,  color: "text-emerald-700",bg: "bg-emerald-100", accent: "from-emerald-500 to-teal-600"    },
-  other:      { label: "Other",     icon: Package,   color: "text-slate-600",  bg: "bg-slate-100",   accent: "from-slate-500 to-gray-600"      },
+const categoryMeta: Record<
+  string,
+  {
+    label: string;
+    icon: React.ElementType;
+    color: string;
+    bg: string;
+    accent: string;
+  }
+> = {
+  "ai-image": {
+    label: "AI Image",
+    icon: ImageIcon,
+    color: "text-violet-700",
+    bg: "bg-violet-100",
+    accent: "from-violet-500 to-purple-600",
+  },
+  research: {
+    label: "Research",
+    icon: FileText,
+    color: "text-blue-700",
+    bg: "bg-blue-100",
+    accent: "from-blue-500 to-cyan-600",
+  },
+  prompt: {
+    label: "Prompt",
+    icon: Sparkles,
+    color: "text-amber-700",
+    bg: "bg-amber-100",
+    accent: "from-amber-500 to-orange-500",
+  },
+  dataset: {
+    label: "Dataset",
+    icon: Database,
+    color: "text-emerald-700",
+    bg: "bg-emerald-100",
+    accent: "from-emerald-500 to-teal-600",
+  },
+  other: {
+    label: "Other",
+    icon: Package,
+    color: "text-slate-600",
+    bg: "bg-slate-100",
+    accent: "from-slate-500 to-gray-600",
+  },
 };
 
 const categoryPlaceholder: Record<string, string> = {
   "ai-image": "from-violet-200 via-purple-100 to-fuchsia-200",
-  research:   "from-blue-200 via-sky-100 to-cyan-200",
-  prompt:     "from-amber-200 via-orange-100 to-yellow-200",
-  dataset:    "from-emerald-200 via-teal-100 to-green-200",
-  other:      "from-slate-200 via-gray-100 to-zinc-200",
+  research: "from-blue-200 via-sky-100 to-cyan-200",
+  prompt: "from-amber-200 via-orange-100 to-yellow-200",
+  dataset: "from-emerald-200 via-teal-100 to-green-200",
+  other: "from-slate-200 via-gray-100 to-zinc-200",
 };
 
 export function FeedCard({ listing }: { listing: Listing }) {
@@ -33,7 +80,8 @@ export function FeedCard({ listing }: { listing: Listing }) {
   const unlocked = purchasedIds.has(listing.id);
   const meta = categoryMeta[listing.category] ?? categoryMeta.other;
   const Icon = meta.icon;
-  const placeholder = categoryPlaceholder[listing.category] ?? categoryPlaceholder.other;
+  const placeholder =
+    categoryPlaceholder[listing.category] ?? categoryPlaceholder.other;
   const price = Number(listing.price);
 
   function handleUnlockSuccess() {
@@ -66,19 +114,25 @@ export function FeedCard({ listing }: { listing: Listing }) {
                           ${unlocked ? "" : "blur-sm scale-[1.04]"}`}
             />
           ) : (
-            <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${placeholder}`}>
+            <div
+              className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${placeholder}`}
+            >
               <Icon className="h-14 w-14 opacity-20 text-neutral-700" />
             </div>
           )}
 
           {/* Dark gradient overlay on hover */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0
-                          opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <div
+            className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0
+                          opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+          />
 
           {/* Category badge — top left */}
           <div className="absolute top-3 left-3">
-            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.68rem] font-semibold
-                              ${meta.bg} ${meta.color} shadow-sm backdrop-blur-sm`}>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.68rem] font-semibold
+                              ${meta.bg} ${meta.color} shadow-sm backdrop-blur-sm`}
+            >
               <Icon className="h-3 w-3" />
               {meta.label}
             </span>
@@ -86,8 +140,10 @@ export function FeedCard({ listing }: { listing: Listing }) {
 
           {/* Price badge — top right */}
           <div className="absolute top-3 right-3">
-            <span className="inline-flex items-center rounded-full bg-white/95 px-2.5 py-1
-                             text-[0.75rem] font-bold text-neutral-900 shadow-sm backdrop-blur-sm">
+            <span
+              className="inline-flex items-center rounded-full bg-white/95 px-2.5 py-1
+                             text-[0.75rem] font-bold text-neutral-900 shadow-sm backdrop-blur-sm"
+            >
               {formatUSDC(price)}
             </span>
           </div>
@@ -95,16 +151,20 @@ export function FeedCard({ listing }: { listing: Listing }) {
           {/* Lock / purchased status — bottom center */}
           {!unlocked ? (
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
-              <span className="flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1
-                               text-[0.68rem] font-semibold text-white backdrop-blur-sm">
+              <span
+                className="flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1
+                               text-[0.68rem] font-semibold text-white backdrop-blur-sm"
+              >
                 <Lock className="h-3 w-3" />
                 Locked
               </span>
             </div>
           ) : (
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
-              <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/90 px-3 py-1
-                               text-[0.68rem] font-semibold text-white backdrop-blur-sm">
+              <span
+                className="flex items-center gap-1.5 rounded-full bg-emerald-500/90 px-3 py-1
+                               text-[0.68rem] font-semibold text-white backdrop-blur-sm"
+              >
                 <CheckCircle2 className="h-3 w-3" />
                 Purchased
               </span>
@@ -116,7 +176,10 @@ export function FeedCard({ listing }: { listing: Listing }) {
             <button
               className={`flex items-center gap-1.5 rounded-full bg-gradient-to-r ${meta.accent}
                           px-3.5 py-1.5 text-[0.72rem] font-semibold text-white shadow-lg`}
-              onClick={(e) => { e.stopPropagation(); handleClick(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClick();
+              }}
             >
               <ShoppingCart className="h-3 w-3" />
               {unlocked ? "Open" : "Unlock"}
@@ -139,16 +202,14 @@ export function FeedCard({ listing }: { listing: Listing }) {
           <div className="flex items-center justify-between pt-1 border-t border-neutral-100">
             <div className="flex items-center gap-2 min-w-0">
               {/* Avatar */}
-              <div className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${meta.accent} text-[0.6rem] font-bold text-white uppercase shadow-sm`}>
+              <div
+                className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${meta.accent} text-[0.6rem] font-bold text-white uppercase shadow-sm`}
+              >
                 {listing.creatorName?.[0] ?? "?"}
               </div>
-              <Link
-                href={`/profile/${listing.creatorUsername ?? listing.creatorAddress}`}
-                onClick={(e) => e.stopPropagation()}
-                className="truncate text-xs font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
-              >
+              <div className="truncate text-xs font-medium text-neutral-600 hover:text-neutral-900 transition-colors">
                 {listing.creatorName}
-              </Link>
+              </div>
             </div>
             <span className="flex-shrink-0 text-xs text-neutral-400">
               {listing.salesCount} sold

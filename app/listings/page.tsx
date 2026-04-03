@@ -69,7 +69,7 @@ export default function ListingsPage() {
 
             {/* Search */}
             <div className="flex w-full max-w-xs items-center gap-2.5 rounded-2xl border border-neutral-200
-                            bg-neutral-50 px-4 py-3 focus-within:border-neutral-400 focus-within:bg-white
+                            bg-white px-4 py-3 focus-within:border-neutral-400
                             transition-all shadow-sm focus-within:shadow-md">
               <Search className="h-3.5 w-3.5 flex-shrink-0 text-neutral-400" />
               <input
