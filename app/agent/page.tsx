@@ -16,6 +16,7 @@ import {
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { CooperMascot } from "@/components/mascot/CooperMascot";
+import { useWallet } from "@/lib/use-wallet";
 import type { AgentLog, Policy } from "@/types";
 import { runBuyerAgent } from "@/lib/agent";
 
@@ -45,6 +46,7 @@ const logColors: Record<AgentLog["type"], string> = {
 };
 
 export default function AgentPage() {
+  const { session, loading: sessionLoading } = useWallet();
   const [goal, setGoal] = useState("find latest Solana research under $5");
   const [maxPrice, setMaxPrice] = useState("5");
   const [running, setRunning] = useState(false);
@@ -65,6 +67,7 @@ export default function AgentPage() {
   }
 
   async function handleRun() {
+    if (!session) return;
     setRunning(true);
     setLogs([]);
     setResult(null);
@@ -73,8 +76,9 @@ export default function AgentPage() {
     const res = await runBuyerAgent(
       { query: goal, maxPrice: Number(maxPrice) },
       policy,
-      "demo-wallet",
-      (log) => setLogs((prev) => [...prev, log])
+      session.walletAddress,
+      (log) => setLogs((prev) => [...prev, log]),
+      session.userId,
     );
 
     setResult({
@@ -140,10 +144,16 @@ export default function AgentPage() {
                 </span>
               </div>
 
-              <Button className="w-full" onClick={handleRun} loading={running} disabled={!goal || running}>
-                <Play className="h-3.5 w-3.5" />
-                {running ? "Agent Running..." : "Run Agent"}
-              </Button>
+              {!sessionLoading && !session ? (
+                <div className="rounded-[1.2rem] border border-red-200 bg-red-50/80 p-3 text-center text-xs text-red-700">
+                  Sign in to run the agent — your OWS wallet is required for payments.
+                </div>
+              ) : (
+                <Button className="w-full" onClick={handleRun} loading={running} disabled={!goal || running || !session}>
+                  <Play className="h-3.5 w-3.5" />
+                  {running ? "Agent Running..." : "Run Agent"}
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

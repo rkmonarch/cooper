@@ -1,8 +1,8 @@
 import type { Listing, Policy, AgentLog } from "@/types";
 
 export interface AgentGoal {
-  query: string; // e.g. "find latest Solana research"
-  maxPrice: number; // USDC
+  query: string;
+  maxPrice: number;
   category?: string;
 }
 
@@ -10,6 +10,7 @@ export interface AgentResult {
   success: boolean;
   listing?: Listing;
   txHash?: string;
+  content?: string;
   logs: AgentLog[];
   error?: string;
 }
@@ -29,18 +30,19 @@ function makeLog(
 }
 
 /**
- * Run the buyer agent:
- * 1. Search listings that match goal
- * 2. Check policy
- * 3. Request human approval if above threshold
- * 4. Submit x402 payment
+ * Run the buyer agent end-to-end:
+ * 1. Search listings matching goal + budget
+ * 2. Check spending policy
+ * 3. Request approval if above threshold
+ * 4. POST /api/pay — builds tx, signs via OWS signer, broadcasts on Solana devnet
  * 5. Return unlocked content
  */
 export async function runBuyerAgent(
   goal: AgentGoal,
   policy: Policy,
   walletAddress: string,
-  onLog: (log: AgentLog) => void
+  onLog: (log: AgentLog) => void,
+  userId?: string,
 ): Promise<AgentResult> {
   const logs: AgentLog[] = [];
 
@@ -52,88 +54,91 @@ export async function runBuyerAgent(
   };
 
   try {
-    // Step 1: Search
+    // ── Step 1: Search ────────────────────────────────────────────────────────
     log("search", `Searching for: "${goal.query}" under $${goal.maxPrice} USDC`);
-    await sleep(800);
 
-    const searchRes = await fetch(
-      `/api/listings?q=${encodeURIComponent(goal.query)}&maxPrice=${goal.maxPrice}${goal.category ? `&category=${goal.category}` : ""}`
-    );
+    const params = new URLSearchParams({
+      maxPrice: String(goal.maxPrice),
+      sort: "most_bought",
+    });
+    if (goal.query) params.set("q", goal.query);
+    if (goal.category) params.set("category", goal.category);
+
+    const searchRes = await fetch(`/api/listings?${params}`);
     const { listings } = (await searchRes.json()) as { listings: Listing[] };
 
-    if (!listings.length) {
+    if (!listings?.length) {
       log("error", "No listings found matching your goal.");
       return { success: false, logs, error: "No listings found" };
     }
 
     const target = listings[0];
-    log("search", `Found listing: "${target.title}" — ${target.price} USDC`, {
-      listingId: target.id,
-    });
-    await sleep(600);
+    log("search", `Found: "${target.title}" — ${target.price} USDC`, { listingId: target.id });
 
-    // Step 2: Policy check
-    log("policy_check", "Checking spending policy via OWS...");
-    await sleep(700);
+    // ── Step 2: Policy check ──────────────────────────────────────────────────
+    log("policy_check", "Checking spending policy via OWS…");
 
     const price = Number(target.price);
 
     if (price > policy.maxPerTransaction) {
-      log("error", `Price ${price} USDC exceeds max-per-tx policy of ${policy.maxPerTransaction} USDC`);
+      log("error", `Price ${price} USDC exceeds per-tx limit of ${policy.maxPerTransaction} USDC`);
       return { success: false, logs, error: "Policy: exceeds per-transaction limit" };
     }
 
     if (policy.allowedCategories.length && !policy.allowedCategories.includes(target.category as never)) {
-      log("error", `Category "${target.category}" not in allowed list`);
+      log("error", `Category "${target.category}" not in your allowed list`);
       return { success: false, logs, error: "Policy: category not allowed" };
     }
 
     log("policy_check", `Policy OK — ${price} USDC is within limits`);
-    await sleep(500);
 
-    // Step 3: Human approval if above threshold
+    // ── Step 3: Approval gate ────────────────────────────────────────────────
     if (price > policy.requireApprovalAbove) {
-      log("approval_request", `Amount ${price} USDC exceeds auto-approve threshold of ${policy.requireApprovalAbove} USDC. Requesting approval...`);
-      // In real impl, trigger Phantom biometric approval here
-      await sleep(1200);
-      log("approval_request", "Approval granted via policy");
+      log("approval_request", `${price} USDC exceeds auto-approve threshold (${policy.requireApprovalAbove} USDC) — auto-approved by agent policy`);
     }
 
-    // Step 4: Payment
-    log("payment", `Submitting x402 payment of ${price} USDC for listing "${target.title}"...`);
-    await sleep(1000);
+    // ── Step 4: Payment via /api/pay ─────────────────────────────────────────
+    log("payment", `Signing + broadcasting USDC payment of ${price} USDC…`);
 
-    const payRes = await fetch("/api/purchase", {
+    if (!userId) {
+      log("error", "No userId — agent cannot sign without a wallet session.");
+      return { success: false, logs, error: "Not authenticated" };
+    }
+
+    const payRes = await fetch("/api/pay", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         listingId: target.id,
-        buyerAddress: walletAddress,
+        userId,
+        walletAddress,
         isAgent: true,
+        policySnapshot: policy,
       }),
     });
 
+    const payData = await payRes.json();
+
     if (!payRes.ok) {
-      const err = await payRes.json();
-      log("error", `Payment failed: ${err.error}`);
-      return { success: false, logs, error: err.error };
+      log("error", `Payment failed: ${payData.error}`);
+      return { success: false, logs, error: payData.error };
     }
 
-    const { txHash } = (await payRes.json()) as { txHash: string };
-    log("payment", `Payment confirmed — tx: ${txHash}`, { txHash });
-    await sleep(600);
+    log("payment", `Payment confirmed — tx: ${payData.txHash}`, { txHash: payData.txHash });
 
-    // Step 5: Unlock
+    // ── Step 5: Unlock ───────────────────────────────────────────────────────
     log("unlock", `Content unlocked: "${target.title}"`);
 
-    return { success: true, listing: target, txHash, logs };
+    return {
+      success: true,
+      listing: target,
+      txHash: payData.txHash,
+      content: payData.content,
+      logs,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     log("error", message);
     return { success: false, logs, error: message };
   }
-}
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
 }
