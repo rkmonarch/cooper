@@ -4,6 +4,7 @@ import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { CooperMascotSmall } from "@/components/mascot/CooperMascot";
 import Providers from "./providers";
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,33 +38,34 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col">
         <Providers>
-        <Header />
-        <main className="flex-1">{children}</main>
-        <footer className="mt-auto border-t border-[var(--border)] bg-white/40 backdrop-blur-sm">
-          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <CooperMascotSmall size={36} />
-                <span className="font-black tracking-[-0.05em] text-[var(--foreground)]">
-                  Cooper
-                </span>
+          <Header />
+          <main className="flex-1">{children}</main>
+          <footer className="mt-auto border-t border-[var(--border)] bg-white/40 backdrop-blur-sm">
+            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <CooperMascotSmall size={36} />
+                  <span className="font-black tracking-[-0.05em] text-[var(--foreground)]">
+                    Cooper
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--muted)]">
+                  Built by{" "}
+                  <a
+                    href="https://github.com/rkmonarch"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-[var(--foreground)] hover:text-[var(--accent-strong)] transition-colors"
+                  >
+                    rkmonarch
+                  </a>{" "}
+                  · © 2026 Cooper
+                </p>
               </div>
-              <p className="text-xs text-[var(--muted)]">
-                Built by{" "}
-                <a
-                  href="https://github.com/rkmonarch"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-[var(--foreground)] hover:text-[var(--accent-strong)] transition-colors"
-                >
-                  rkmonarch
-                </a>{" "}
-                · © 2026 Cooper
-              </p>
             </div>
-          </div>
-        </footer>
+          </footer>
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
