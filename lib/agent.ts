@@ -58,18 +58,37 @@ export async function runBuyerAgent(
     const categoryLabel = goal.category ? ` in "${goal.category}"` : "";
     log("search", `Searching for: "${goal.query}"${categoryLabel} under $${goal.maxPrice} USDC`);
 
-    // Use category + price to search — do NOT pass the raw goal text as a title
-    // query because it's natural language and won't match listing titles.
-    const params = new URLSearchParams({
+    // Extract a short keyword from the goal text for title matching.
+    // Strip filler phrases so "find the best Solana research" → "Solana research".
+    const keyword = goal.query
+      .replace(/^(find|get|search|buy|purchase|look for|show me|give me|i want|i need)\s+(me\s+)?(a\s+|an\s+|the\s+|best\s+|latest\s+|top\s+)*/i, "")
+      .replace(/\s+under\s+\$?\d+.*$/i, "")
+      .trim();
+
+    const baseParams = {
       maxPrice: String(goal.maxPrice),
       sort: "most_bought",
-    });
-    if (goal.category) params.set("category", goal.category);
+      ...(goal.category ? { category: goal.category } : {}),
+    };
 
-    const searchRes = await fetch(`/api/listings?${params}`);
-    const { listings } = (await searchRes.json()) as { listings: Listing[] };
+    // First try: search with extracted keyword
+    let listings: Listing[] = [];
+    if (keyword) {
+      const p = new URLSearchParams({ ...baseParams, q: keyword });
+      const res = await fetch(`/api/listings?${p}`);
+      const data = await res.json() as { listings: Listing[] };
+      listings = data.listings ?? [];
+    }
 
-    if (!listings?.length) {
+    // Fallback: no keyword match — return best within budget + category
+    if (!listings.length) {
+      const p = new URLSearchParams(baseParams);
+      const res = await fetch(`/api/listings?${p}`);
+      const data = await res.json() as { listings: Listing[] };
+      listings = data.listings ?? [];
+    }
+
+    if (!listings.length) {
       log("error", "No listings found matching your goal.");
       return { success: false, logs, error: "No listings found" };
     }
