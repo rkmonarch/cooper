@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Listing has no creator address" }, { status: 400 });
   }
 
-  let txSignature: string;
+  let txSignature = "";
   try {
     // Warm up the signer + preflight in parallel BEFORE touching the chain.
     // Pass mnemonic so the signer can restore the wallet if its vault was wiped.
