@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
     // as a new deployment would produce a different address.
     const vaultId = walletName(userId);
     const [user] = await db
-      .select({ walletAddress: users.walletAddress })
+      .select({ walletAddress: users.walletAddress, spendingPolicy: users.spendingPolicy })
       .from(users)
       .where(eq(users.owsVaultId, vaultId))
       .limit(1);
@@ -124,32 +124,39 @@ export async function GET(req: NextRequest) {
     const solBalance = solLamports / 1e9;
     const usdcBalance = tokenBalance ? Number(tokenBalance.value.uiAmount ?? 0) : 0;
 
-    return NextResponse.json({ walletAddress: address, solBalance, usdcBalance });
+    return NextResponse.json({ walletAddress: address, solBalance, usdcBalance, spendingPolicy: user.spendingPolicy ?? null });
   } catch (err: any) {
     console.error("[wallet] GET error:", err);
     return NextResponse.json({ error: err.message ?? "Failed to get wallet" }, { status: 500 });
   }
 }
 
-/** PATCH /api/wallet — update username for a wallet address */
+/** PATCH /api/wallet — update username and/or spending policy for a wallet address */
 export async function PATCH(req: NextRequest) {
   try {
-    const { walletAddress, username } = await req.json();
-    if (!walletAddress || !username) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    const { walletAddress, username, spendingPolicy } = await req.json();
+    if (!walletAddress) return NextResponse.json({ error: "Missing walletAddress" }, { status: 400 });
 
-    const clean = username.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 20);
-    if (clean.length < 3) return NextResponse.json({ error: "Username must be at least 3 characters" }, { status: 400 });
-
-    const taken = await db.select({ id: users.id }).from(users).where(eq(users.username, clean)).limit(1);
-    if (taken.length > 0) return NextResponse.json({ error: "Username already taken" }, { status: 409 });
-
-    // Look up user — try walletAddress first, then email fallback
     const [user] = await db.select({ id: users.id }).from(users).where(eq(users.walletAddress, walletAddress)).limit(1);
     if (!user) return NextResponse.json({ error: "User not found for that wallet address" }, { status: 404 });
 
-    await db.update(users).set({ username: clean }).where(eq(users.id, user.id));
-    return NextResponse.json({ username: clean });
+    const updates: Record<string, unknown> = {};
+
+    if (username !== undefined) {
+      const clean = username.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 20);
+      if (clean.length < 3) return NextResponse.json({ error: "Username must be at least 3 characters" }, { status: 400 });
+      const taken = await db.select({ id: users.id }).from(users).where(eq(users.username, clean)).limit(1);
+      if (taken.length > 0) return NextResponse.json({ error: "Username already taken" }, { status: 409 });
+      updates.username = clean;
+    }
+
+    if (spendingPolicy !== undefined) {
+      updates.spendingPolicy = spendingPolicy;
+    }
+
+    await db.update(users).set(updates).where(eq(users.id, user.id));
+    return NextResponse.json({ ok: true, ...updates });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message ?? "Failed to update username" }, { status: 500 });
+    return NextResponse.json({ error: err.message ?? "Failed to update" }, { status: 500 });
   }
 }

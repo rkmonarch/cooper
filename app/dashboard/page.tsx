@@ -34,10 +34,25 @@ export default function DashboardPage() {
   }, [session?.username]);
 
   useEffect(() => {
+    // Load policy from localStorage immediately as a fast fallback
+    try {
+      const stored = localStorage.getItem("cooper_policy");
+      if (stored) setPolicy(JSON.parse(stored));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
     if (!session?.userId) return;
     fetch(`/api/wallet?userId=${session.userId}`)
       .then((r) => r.json())
-      .then((d) => { if (d.solBalance != null) setBalances({ solBalance: d.solBalance, usdcBalance: d.usdcBalance ?? 0 }); })
+      .then((d) => {
+        if (d.solBalance != null) setBalances({ solBalance: d.solBalance, usdcBalance: d.usdcBalance ?? 0 });
+        // DB value takes precedence over localStorage
+        if (d.spendingPolicy) {
+          setPolicy(d.spendingPolicy);
+          localStorage.setItem("cooper_policy", JSON.stringify(d.spendingPolicy));
+        }
+      })
       .catch(() => {});
   }, [session?.userId]);
 
@@ -69,8 +84,15 @@ export default function DashboardPage() {
     }
   }
 
-  function savePolicy() {
+  async function savePolicy() {
+    if (!session?.walletAddress) return;
+    // Persist to both DB and localStorage
     localStorage.setItem("cooper_policy", JSON.stringify(policy));
+    await fetch("/api/wallet", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ walletAddress: session.walletAddress, spendingPolicy: policy }),
+    });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }

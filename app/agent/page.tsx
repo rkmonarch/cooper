@@ -52,6 +52,7 @@ export default function AgentPage() {
   const [goal, setGoal] = useState("Find the best Solana research paper");
   const [maxPrice, setMaxPrice] = useState("5");
   const [category, setCategory] = useState<ListingCategory | "">("");
+  const [policy, setPolicy] = useState<Policy>(DEFAULT_POLICY);
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState<AgentLog[]>([]);
   const [result, setResult] = useState<{ success: boolean; txHash?: string; content?: string } | null>(null);
@@ -61,21 +62,26 @@ export default function AgentPage() {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
 
-  function getPolicy(): Policy {
+  useEffect(() => {
     try {
       const stored = localStorage.getItem("cooper_policy");
-      if (stored) return JSON.parse(stored);
+      if (stored) setPolicy(JSON.parse(stored));
     } catch {}
-    return DEFAULT_POLICY;
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!session?.userId) return;
+    fetch(`/api/wallet?userId=${session.userId}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.spendingPolicy) setPolicy(d.spendingPolicy); })
+      .catch(() => {});
+  }, [session?.userId]);
 
   async function handleRun() {
     if (!session) return;
     setRunning(true);
     setLogs([]);
     setResult(null);
-
-    const policy = getPolicy();
     const res = await runBuyerAgent(
       { query: goal, maxPrice: Number(maxPrice), category: category || undefined },
       policy,
