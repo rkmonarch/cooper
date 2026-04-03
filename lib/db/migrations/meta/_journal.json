@@ -8,6 +8,13 @@
       "when": 1775118150018,
       "tag": "0000_loud_blindfold",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775194858045,
+      "tag": "0001_friendly_stryfe",
+      "breakpoints": true
     }
   ]
 }

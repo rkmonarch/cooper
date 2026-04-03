@@ -2,6 +2,8 @@ import express, { Request, Response, NextFunction } from "express";
 import {
   createWallet,
   getWallet,
+  importWalletMnemonic,
+  exportWallet,
   signTransaction,
 } from "@open-wallet-standard/core";
 
@@ -27,14 +29,6 @@ function requireSecret(req: Request, res: Response, next: NextFunction) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function getOrCreate(vaultId: string) {
-  try {
-    return getWallet(vaultId);
-  } catch {
-    return createWallet(vaultId);
-  }
-}
-
 function solanaAddress(wallet: ReturnType<typeof getWallet>): string {
   const account = wallet.accounts.find(
     (a) =>
@@ -46,16 +40,32 @@ function solanaAddress(wallet: ReturnType<typeof getWallet>): string {
   return account.address;
 }
 
+/**
+ * Ensure wallet is loaded in vault.
+ * Priority: existing vault entry → import from mnemonic → create fresh.
+ */
+function ensureWallet(vaultId: string, mnemonic?: string): ReturnType<typeof getWallet> {
+  try {
+    return getWallet(vaultId);
+  } catch {
+    if (mnemonic) {
+      return importWalletMnemonic(vaultId, mnemonic);
+    }
+    return createWallet(vaultId);
+  }
+}
+
 // ── Health check ───────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
 // ── POST /wallet ───────────────────────────────────────────────────────────────
-// Creates or retrieves OWS wallet, returns Solana address.
-// Body: { vaultId: string }
+// Creates or restores OWS wallet. Returns Solana address + mnemonic so the
+// caller can persist it and pass it back on future sign requests.
+// Body: { vaultId: string, mnemonic?: string }
 app.post("/wallet", requireSecret, (req: Request, res: Response) => {
-  const { vaultId } = req.body as { vaultId?: string };
+  const { vaultId, mnemonic } = req.body as { vaultId?: string; mnemonic?: string };
 
   if (!vaultId) {
     res.status(400).json({ error: "Missing vaultId" });
@@ -63,9 +73,10 @@ app.post("/wallet", requireSecret, (req: Request, res: Response) => {
   }
 
   try {
-    const wallet = getOrCreate(vaultId);
+    const wallet = ensureWallet(vaultId, mnemonic);
     const address = solanaAddress(wallet);
-    res.json({ address });
+    const exported = exportWallet(vaultId);
+    res.json({ address, mnemonic: exported });
   } catch (err: any) {
     console.error("[wallet]", err);
     res.status(500).json({ error: err.message ?? "Failed to create wallet" });
@@ -73,10 +84,16 @@ app.post("/wallet", requireSecret, (req: Request, res: Response) => {
 });
 
 // ── POST /sign ─────────────────────────────────────────────────────────────────
-// Signs a serialized Solana transaction, returns the 64-byte Ed25519 signature.
-// Body: { vaultId: string, txHex: string }
+// Signs a serialized Solana transaction.
+// If the vault was wiped (server restart), mnemonic is used to restore the
+// exact same key before signing — no more "vault not found" after restarts.
+// Body: { vaultId: string, txHex: string, mnemonic?: string }
 app.post("/sign", requireSecret, (req: Request, res: Response) => {
-  const { vaultId, txHex } = req.body as { vaultId?: string; txHex?: string };
+  const { vaultId, txHex, mnemonic } = req.body as {
+    vaultId?: string;
+    txHex?: string;
+    mnemonic?: string;
+  };
 
   if (!vaultId || !txHex) {
     res.status(400).json({ error: "Missing vaultId or txHex" });
@@ -84,12 +101,9 @@ app.post("/sign", requireSecret, (req: Request, res: Response) => {
   }
 
   try {
-    // Wallet must already exist — we never create on sign
-    getWallet(vaultId);
-  } catch {
-    res.status(404).json({
-      error: `Vault "${vaultId}" not found. Call POST /wallet first to initialise it.`,
-    });
+    ensureWallet(vaultId, mnemonic);
+  } catch (err: any) {
+    res.status(500).json({ error: `Failed to load vault "${vaultId}": ${err.message}` });
     return;
   }
 

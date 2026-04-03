@@ -19,6 +19,7 @@ export const users = pgTable("users", {
   email: text("email").unique(),
   username: text("username").unique(),
   owsVaultId: text("ows_vault_id").unique(),
+  owsMnemonic: text("ows_mnemonic"), // BIP-39 mnemonic — lets signer restore key after restart
   // Spending policy stored as JSONB
   spendingPolicy: jsonb("spending_policy").$type<{
     dailyLimit: number;

@@ -2,27 +2,27 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, CheckCircle2, Sparkles, FileText, ImageIcon, Database, Package, ArrowRight } from "lucide-react";
+import { Lock, CheckCircle2, Sparkles, FileText, ImageIcon, Database, Package, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { UnlockModal } from "./UnlockModal";
 import { usePurchases } from "@/lib/use-purchases";
 import { formatUSDC } from "@/lib/utils";
 import type { Listing } from "@/types";
 
-const categoryMeta: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
-  "ai-image": { label: "AI Image",  icon: ImageIcon, color: "text-violet-600", bg: "bg-violet-50" },
-  research:   { label: "Research",  icon: FileText,  color: "text-blue-600",   bg: "bg-blue-50"   },
-  prompt:     { label: "Prompt",    icon: Sparkles,  color: "text-amber-600",  bg: "bg-amber-50"  },
-  dataset:    { label: "Dataset",   icon: Database,  color: "text-emerald-600",bg: "bg-emerald-50"},
-  other:      { label: "Other",     icon: Package,   color: "text-slate-500",  bg: "bg-slate-50"  },
+const categoryMeta: Record<string, { label: string; icon: React.ElementType; color: string; bg: string; accent: string }> = {
+  "ai-image": { label: "AI Image",  icon: ImageIcon, color: "text-violet-700", bg: "bg-violet-100",  accent: "from-violet-500 to-purple-600"  },
+  research:   { label: "Research",  icon: FileText,  color: "text-blue-700",   bg: "bg-blue-100",    accent: "from-blue-500 to-cyan-600"       },
+  prompt:     { label: "Prompt",    icon: Sparkles,  color: "text-amber-700",  bg: "bg-amber-100",   accent: "from-amber-500 to-orange-500"    },
+  dataset:    { label: "Dataset",   icon: Database,  color: "text-emerald-700",bg: "bg-emerald-100", accent: "from-emerald-500 to-teal-600"    },
+  other:      { label: "Other",     icon: Package,   color: "text-slate-600",  bg: "bg-slate-100",   accent: "from-slate-500 to-gray-600"      },
 };
 
 const categoryPlaceholder: Record<string, string> = {
-  "ai-image": "bg-gradient-to-br from-violet-100 to-purple-200",
-  research:   "bg-gradient-to-br from-blue-100 to-sky-200",
-  prompt:     "bg-gradient-to-br from-amber-100 to-orange-200",
-  dataset:    "bg-gradient-to-br from-emerald-100 to-teal-200",
-  other:      "bg-gradient-to-br from-slate-100 to-gray-200",
+  "ai-image": "from-violet-200 via-purple-100 to-fuchsia-200",
+  research:   "from-blue-200 via-sky-100 to-cyan-200",
+  prompt:     "from-amber-200 via-orange-100 to-yellow-200",
+  dataset:    "from-emerald-200 via-teal-100 to-green-200",
+  other:      "from-slate-200 via-gray-100 to-zinc-200",
 };
 
 export function FeedCard({ listing }: { listing: Listing }) {
@@ -42,89 +42,117 @@ export function FeedCard({ listing }: { listing: Listing }) {
     router.push(`/content/${listing.id}`);
   }
 
+  function handleClick() {
+    if (unlocked) router.push(`/content/${listing.id}`);
+    else setModalOpen(true);
+  }
+
   return (
     <>
       <article
-        className="group flex flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white transition-all duration-200 hover:border-neutral-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] cursor-pointer"
-        onClick={() => !unlocked ? setModalOpen(true) : router.push(`/content/${listing.id}`)}
+        onClick={handleClick}
+        className="group relative flex flex-col overflow-hidden rounded-2xl bg-white cursor-pointer
+                   shadow-[0_1px_4px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.06)]
+                   hover:shadow-[0_8px_40px_rgba(0,0,0,0.14)]
+                   transition-all duration-300 hover:-translate-y-1"
       >
-        {/* Image */}
-        <div className="relative aspect-[16/10] w-full overflow-hidden bg-neutral-100">
+        {/* ── Image ─────────────────────────────────────────────────────────── */}
+        <div className="relative aspect-[4/3] w-full overflow-hidden bg-neutral-100">
           {listing.previewUrl ? (
             <img
               src={listing.previewUrl}
               alt={listing.title}
-              className={`h-full w-full object-cover transition-all duration-500 group-hover:scale-[1.03] ${
-                unlocked ? "" : "blur-md scale-105"
-              }`}
+              className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.06]
+                          ${unlocked ? "" : "blur-sm scale-[1.04]"}`}
             />
           ) : (
-            <div className={`flex h-full w-full items-center justify-center ${placeholder}`}>
-              <Icon className="h-10 w-10 opacity-30 text-[var(--foreground)]" />
+            <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${placeholder}`}>
+              <Icon className="h-14 w-14 opacity-20 text-neutral-700" />
             </div>
           )}
 
-          {/* Lock pill — bottom center, only when locked */}
-          {!unlocked && (
+          {/* Dark gradient overlay on hover */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0
+                          opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+          {/* Category badge — top left */}
+          <div className="absolute top-3 left-3">
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.68rem] font-semibold
+                              ${meta.bg} ${meta.color} shadow-sm backdrop-blur-sm`}>
+              <Icon className="h-3 w-3" />
+              {meta.label}
+            </span>
+          </div>
+
+          {/* Price badge — top right */}
+          <div className="absolute top-3 right-3">
+            <span className="inline-flex items-center rounded-full bg-white/95 px-2.5 py-1
+                             text-[0.75rem] font-bold text-neutral-900 shadow-sm backdrop-blur-sm">
+              {formatUSDC(price)}
+            </span>
+          </div>
+
+          {/* Lock / purchased status — bottom center */}
+          {!unlocked ? (
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
-              <span className="flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1 text-[0.68rem] font-semibold text-white backdrop-blur-sm">
+              <span className="flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1
+                               text-[0.68rem] font-semibold text-white backdrop-blur-sm">
                 <Lock className="h-3 w-3" />
                 Locked
               </span>
             </div>
-          )}
-
-          {/* Unlocked indicator */}
-          {unlocked && (
+          ) : (
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
-              <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/90 px-3 py-1 text-[0.68rem] font-semibold text-white backdrop-blur-sm">
+              <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/90 px-3 py-1
+                               text-[0.68rem] font-semibold text-white backdrop-blur-sm">
                 <CheckCircle2 className="h-3 w-3" />
                 Purchased
               </span>
             </div>
           )}
+
+          {/* Hover CTA */}
+          <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200">
+            <button
+              className={`flex items-center gap-1.5 rounded-full bg-gradient-to-r ${meta.accent}
+                          px-3.5 py-1.5 text-[0.72rem] font-semibold text-white shadow-lg`}
+              onClick={(e) => { e.stopPropagation(); handleClick(); }}
+            >
+              <ShoppingCart className="h-3 w-3" />
+              {unlocked ? "Open" : "Unlock"}
+            </button>
+          </div>
         </div>
 
-        {/* Body */}
-        <div className="flex flex-1 flex-col p-4 gap-3">
-          {/* Category + price row */}
-          <div className="flex items-center justify-between">
-            <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[0.68rem] font-semibold ${meta.bg} ${meta.color}`}>
-              <Icon className="h-3 w-3" />
-              {meta.label}
-            </span>
-            <span className="text-sm font-bold text-neutral-900">
-              {formatUSDC(price)}
-            </span>
-          </div>
-
-          {/* Title + description */}
-          <div className="flex-1">
-            <h3 className="line-clamp-1 text-sm font-semibold text-neutral-900 leading-snug">
+        {/* ── Body ──────────────────────────────────────────────────────────── */}
+        <div className="flex flex-1 flex-col gap-2.5 p-4">
+          <div>
+            <h3 className="line-clamp-1 text-[0.95rem] font-bold leading-snug text-neutral-900 group-hover:text-neutral-700 transition-colors">
               {listing.title}
             </h3>
-            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-neutral-500">
+            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-neutral-500">
               {listing.description}
             </p>
           </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-between pt-2 border-t border-neutral-100">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-neutral-100 text-[0.55rem] font-bold text-neutral-500 uppercase">
+          {/* Creator row */}
+          <div className="flex items-center justify-between pt-1 border-t border-neutral-100">
+            <div className="flex items-center gap-2 min-w-0">
+              {/* Avatar */}
+              <div className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${meta.accent} text-[0.6rem] font-bold text-white uppercase shadow-sm`}>
                 {listing.creatorName?.[0] ?? "?"}
               </div>
               <Link
                 href={`/profile/${listing.creatorUsername ?? listing.creatorAddress}`}
                 onClick={(e) => e.stopPropagation()}
-                className="truncate text-xs text-neutral-500 hover:text-neutral-900 hover:underline transition-colors"
+                className="truncate text-xs font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
               >
                 {listing.creatorName}
               </Link>
-              <span className="text-neutral-300">·</span>
-              <span className="flex-shrink-0 text-xs text-neutral-400">{listing.salesCount} sold</span>
             </div>
-            <ArrowRight className="h-3.5 w-3.5 flex-shrink-0 text-neutral-300 transition-transform group-hover:translate-x-0.5 group-hover:text-neutral-500" />
+            <span className="flex-shrink-0 text-xs text-neutral-400">
+              {listing.salesCount} sold
+            </span>
           </div>
         </div>
       </article>

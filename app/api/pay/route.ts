@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { listings, payments, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { remoteSign } from "@/lib/signer-client";
+import { remoteSign, remoteGetOrCreateWallet } from "@/lib/signer-client";
 import { buildUsdcTransferTx, preflightCheck, DEVNET_CONNECTION } from "@/lib/solana-payment";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   // This is the exact vault name used when the wallet was originally created —
   // avoids any userId format mismatch (Google sub vs UUID etc).
   const [userRow] = await db
-    .select({ owsVaultId: users.owsVaultId })
+    .select({ owsVaultId: users.owsVaultId, owsMnemonic: users.owsMnemonic })
     .from(users)
     .where(eq(users.walletAddress, buyerAddress))
     .limit(1);
@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Vault ID not found. Please sign out and sign in again." }, { status: 400 });
   }
   const vaultId = userRow.owsVaultId;
+  const mnemonic = userRow.owsMnemonic;
 
   // Fetch listing
   const [listing] = await db
@@ -58,35 +59,82 @@ export async function POST(req: NextRequest) {
 
   let txSignature: string;
   try {
-    // Preflight: verify buyer has enough SOL + USDC before touching the chain
-    await preflightCheck(buyerAddress, recipient, Number(listing.price));
-
-    // Build unsigned tx (fetches fresh blockhash from DEVNET_CONNECTION)
-    const tx = await buildUsdcTransferTx(buyerAddress, recipient, Number(listing.price));
-
-    // Sign via the remote signer server (ngrok locally, Railway in prod)
-    const signedTx = await remoteSign(vaultId, tx);
-
-    // Broadcast via our own connection with skipPreflight=true so we're
-    // not subject to which devnet node does the simulation
-    txSignature = await DEVNET_CONNECTION.sendRawTransaction(
-      signedTx.serialize(),
-      { skipPreflight: true, preflightCommitment: "confirmed" },
-    );
-
-    // Wait for confirmation (30s timeout to avoid hanging forever on devnet)
-    const { blockhash, lastValidBlockHeight } = await DEVNET_CONNECTION.getLatestBlockhash("confirmed");
-    const confirmation = await Promise.race([
-      DEVNET_CONNECTION.confirmTransaction(
-        { signature: txSignature, blockhash, lastValidBlockHeight },
-        "confirmed",
-      ),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Transaction confirmation timed out after 30s")), 30_000)
-      ),
+    // Warm up the signer + preflight in parallel BEFORE touching the chain.
+    // Pass mnemonic so the signer can restore the wallet if its vault was wiped.
+    await Promise.all([
+      remoteGetOrCreateWallet(vaultId, mnemonic),
+      preflightCheck(buyerAddress, recipient, Number(listing.price)),
     ]);
-    if ((confirmation as any)?.value?.err) {
-      throw new Error(`Transaction failed on-chain: ${JSON.stringify((confirmation as any).value.err)}`);
+
+    // Retry loop: "block height exceeded" means the blockhash expired before
+    // the tx was processed — just grab a fresh one and try again (up to 3x).
+    let confirmed = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      // Fetch a single fresh blockhash and share it between the tx builder
+      // and confirmTransaction so we're tracking the exact same expiry window.
+      const { blockhash, lastValidBlockHeight } =
+        await DEVNET_CONNECTION.getLatestBlockhash("confirmed");
+
+      const tx = await buildUsdcTransferTx(
+        buyerAddress, recipient, Number(listing.price), blockhash,
+      );
+      const signedTx = await remoteSign(vaultId, tx, mnemonic);
+
+      txSignature = await DEVNET_CONNECTION.sendRawTransaction(
+        signedTx.serialize(),
+        { skipPreflight: true, preflightCommitment: "confirmed" },
+      );
+
+      // Wait for confirmation using the same blockhash window as the tx.
+      // Fall back to polling if the websocket times out.
+      try {
+        const confirmation = await Promise.race([
+          DEVNET_CONNECTION.confirmTransaction(
+            { signature: txSignature, blockhash, lastValidBlockHeight },
+            "confirmed",
+          ),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("timeout")), 60_000)
+          ),
+        ]);
+        if ((confirmation as any)?.value?.err) {
+          const errStr = JSON.stringify((confirmation as any).value.err);
+          if (errStr.includes("BlockhashNotFound") || errStr.includes("block height exceeded")) {
+            continue; // retry with a fresh blockhash
+          }
+          throw new Error(`Transaction failed on-chain: ${errStr}`);
+        }
+        confirmed = true;
+        break;
+      } catch (err: any) {
+        if (err.message === "timeout") {
+          // Websocket timed out — poll to see if the tx actually landed
+          for (let i = 0; i < 6; i++) {
+            await new Promise((r) => setTimeout(r, 5_000));
+            const statuses = await DEVNET_CONNECTION.getSignatureStatuses([txSignature]);
+            const status = statuses?.value?.[0];
+            if (status && !status.err &&
+                (status.confirmationStatus === "confirmed" || status.confirmationStatus === "finalized")) {
+              confirmed = true;
+              break;
+            }
+            if (status?.err) throw new Error(`Transaction failed on-chain: ${JSON.stringify(status.err)}`);
+          }
+          if (confirmed) break;
+          throw new Error("Transaction confirmation timed out. Check Solana Explorer before retrying.");
+        }
+        if (
+          attempt < 2 &&
+          (err.message?.includes("block height exceeded") || err.message?.includes("BlockhashNotFound"))
+        ) {
+          continue; // retry
+        }
+        throw err;
+      }
+    }
+
+    if (!confirmed) {
+      throw new Error("Transaction failed after 3 attempts (blockhash kept expiring). Please try again.");
     }
   } catch (err: any) {
     console.error("[pay] sign+send error:", err);

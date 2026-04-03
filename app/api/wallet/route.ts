@@ -34,14 +34,14 @@ export async function POST(req: NextRequest) {
     // deployment the OWS vault is empty and would generate a different address.
     if (email) {
       const byEmail = await db
-        .select({ id: users.id, walletAddress: users.walletAddress, owsVaultId: users.owsVaultId, username: users.username })
+        .select({ id: users.id, walletAddress: users.walletAddress, owsVaultId: users.owsVaultId, username: users.username, owsMnemonic: users.owsMnemonic })
         .from(users)
         .where(eq(users.email, email))
         .limit(1);
 
       if (byEmail.length > 0) {
         const existingVaultId = byEmail[0].owsVaultId ?? vaultId;
-        await remoteGetOrCreateWallet(existingVaultId).catch(() => null);
+        const signerRes = await remoteGetOrCreateWallet(existingVaultId, byEmail[0].owsMnemonic).catch(() => null);
         // Backfill username if missing
         const username = byEmail[0].username
           ? byEmail[0].username
@@ -53,6 +53,8 @@ export async function POST(req: NextRequest) {
             username,
             ...(displayName ? { displayName } : {}),
             ...(!byEmail[0].owsVaultId ? { owsVaultId: vaultId } : {}),
+            // Persist mnemonic if we just learned it (new wallet or first time storing)
+            ...(!byEmail[0].owsMnemonic && signerRes?.mnemonic ? { owsMnemonic: signerRes.mnemonic } : {}),
           })
           .where(eq(users.id, byEmail[0].id));
         return NextResponse.json({ walletAddress: byEmail[0].walletAddress, username, userId });
@@ -75,13 +77,14 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Step 3: truly new user — create OWS wallet via signer server and insert ──
-    const address = await remoteGetOrCreateWallet(vaultId);
+    const { address, mnemonic } = await remoteGetOrCreateWallet(vaultId);
     const username = await generateUsername();
 
     await db.insert(users).values({
       walletAddress: address,
       displayName: displayName ?? "Anonymous",
       owsVaultId: vaultId,
+      owsMnemonic: mnemonic,
       username,
       ...(email ? { email } : {}),
     } as any);

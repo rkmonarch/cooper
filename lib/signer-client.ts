@@ -26,26 +26,36 @@ async function signerFetch(path: string, body: object) {
   try {
     data = JSON.parse(text);
   } catch {
-    // Signer returned non-JSON (e.g. sleeping on Render free tier)
     throw new Error(`Signer server error (${res.status}): ${text}`);
   }
   if (!res.ok) throw new Error(data.error ?? `Signer ${path} failed`);
   return data;
 }
 
-/** Create or retrieve the OWS wallet on the signer server. Returns Solana address. */
-export async function remoteGetOrCreateWallet(vaultId: string): Promise<string> {
-  const data = await signerFetch("/wallet", { vaultId });
-  return data.address as string;
+/**
+ * Create or restore the OWS wallet on the signer server.
+ * Passing the stored mnemonic ensures the same key is restored after a restart.
+ * Returns { address, mnemonic } — persist the mnemonic if this is a new wallet.
+ */
+export async function remoteGetOrCreateWallet(
+  vaultId: string,
+  mnemonic?: string | null,
+): Promise<{ address: string; mnemonic: string }> {
+  const data = await signerFetch("/wallet", { vaultId, mnemonic: mnemonic ?? undefined });
+  return { address: data.address as string, mnemonic: data.mnemonic as string };
 }
 
-/** Sign a VersionedTransaction via the remote signer. Injects signature in-place. */
+/**
+ * Sign a VersionedTransaction via the remote signer.
+ * Pass the stored mnemonic so the signer can self-heal after a vault wipe.
+ */
 export async function remoteSign(
   vaultId: string,
-  tx: VersionedTransaction
+  tx: VersionedTransaction,
+  mnemonic?: string | null,
 ): Promise<VersionedTransaction> {
   const txHex = Buffer.from(tx.serialize()).toString("hex");
-  const data = await signerFetch("/sign", { vaultId, txHex });
+  const data = await signerFetch("/sign", { vaultId, txHex, mnemonic: mnemonic ?? undefined });
   const sigBytes = Buffer.from(data.signature as string, "hex");
   tx.signatures[0] = sigBytes;
   return tx;

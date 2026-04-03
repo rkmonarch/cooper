@@ -46,6 +46,8 @@ export async function buildUsdcTransferTx(
   fromPubkey: string,
   toPubkey: string,
   amountUsdc: number,
+  /** Pass a pre-fetched blockhash to avoid fetching twice and keep the window fresh. */
+  recentBlockhash?: string,
 ): Promise<VersionedTransaction> {
   const from = new PublicKey(fromPubkey);
   const to = new PublicKey(toPubkey);
@@ -55,7 +57,9 @@ export async function buildUsdcTransferTx(
 
   const amountRaw = BigInt(Math.round(amountUsdc * 10 ** USDC_DECIMALS));
 
-  const { blockhash } = await DEVNET_CONNECTION.getLatestBlockhash("confirmed");
+  const { blockhash } = recentBlockhash
+    ? { blockhash: recentBlockhash }
+    : await DEVNET_CONNECTION.getLatestBlockhash("confirmed");
 
   const instructions = [
     // Idempotent: creates buyer's ATA if missing, no-ops if it already exists
