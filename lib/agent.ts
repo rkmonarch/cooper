@@ -55,13 +55,15 @@ export async function runBuyerAgent(
 
   try {
     // ── Step 1: Search ────────────────────────────────────────────────────────
-    log("search", `Searching for: "${goal.query}" under $${goal.maxPrice} USDC`);
+    const categoryLabel = goal.category ? ` in "${goal.category}"` : "";
+    log("search", `Searching for: "${goal.query}"${categoryLabel} under $${goal.maxPrice} USDC`);
 
+    // Use category + price to search — do NOT pass the raw goal text as a title
+    // query because it's natural language and won't match listing titles.
     const params = new URLSearchParams({
       maxPrice: String(goal.maxPrice),
       sort: "most_bought",
     });
-    if (goal.query) params.set("q", goal.query);
     if (goal.category) params.set("category", goal.category);
 
     const searchRes = await fetch(`/api/listings?${params}`);

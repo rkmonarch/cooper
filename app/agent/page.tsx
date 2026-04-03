@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   Bot,
@@ -17,7 +18,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { CooperMascot } from "@/components/mascot/CooperMascot";
 import { useWallet } from "@/lib/use-wallet";
-import type { AgentLog, Policy } from "@/types";
+import type { AgentLog, ListingCategory, Policy } from "@/types";
 import { runBuyerAgent } from "@/lib/agent";
 
 const DEFAULT_POLICY: Policy = {
@@ -46,9 +47,11 @@ const logColors: Record<AgentLog["type"], string> = {
 };
 
 export default function AgentPage() {
+  const router = useRouter();
   const { session, loading: sessionLoading } = useWallet();
-  const [goal, setGoal] = useState("find latest Solana research under $5");
+  const [goal, setGoal] = useState("Find the best Solana research paper");
   const [maxPrice, setMaxPrice] = useState("5");
+  const [category, setCategory] = useState<ListingCategory | "">("");
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState<AgentLog[]>([]);
   const [result, setResult] = useState<{ success: boolean; txHash?: string; content?: string } | null>(null);
@@ -74,7 +77,7 @@ export default function AgentPage() {
 
     const policy = getPolicy();
     const res = await runBuyerAgent(
-      { query: goal, maxPrice: Number(maxPrice) },
+      { query: goal, maxPrice: Number(maxPrice), category: category || undefined },
       policy,
       session.walletAddress,
       (log) => setLogs((prev) => [...prev, log]),
@@ -87,6 +90,10 @@ export default function AgentPage() {
       content: res.listing ? `Unlocked: ${res.listing.title}` : res.error,
     });
     setRunning(false);
+
+    if (res.success && res.listing) {
+      router.push(`/content/${res.listing.id}`);
+    }
   }
 
   return (
@@ -134,6 +141,24 @@ export default function AgentPage() {
                   onChange={(e) => setMaxPrice(e.target.value)}
                   className="w-full rounded-[1.2rem] px-4 py-3 text-sm"
                 />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                  Category (optional)
+                </label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as ListingCategory | "")}
+                  className="w-full rounded-[1.2rem] px-4 py-3 text-sm bg-white border border-neutral-200"
+                >
+                  <option value="">Any category</option>
+                  <option value="prompt">Prompts</option>
+                  <option value="research">Research</option>
+                  <option value="ai-image">AI Images</option>
+                  <option value="dataset">Datasets</option>
+                  <option value="other">Other</option>
+                </select>
               </div>
 
               <div className="flex items-start gap-2 rounded-[1.35rem] border border-lime-200 bg-lime-100/70 p-4 text-xs text-[var(--foreground)]">
