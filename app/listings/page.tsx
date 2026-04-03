@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Sparkles, FileText, ImageIcon, Database, Package, Globe, Search } from "lucide-react";
+import { Sparkles, FileText, ImageIcon, Database, Package, Globe } from "lucide-react";
 import { FeedCard } from "@/components/marketplace/FeedCard";
 import type { Listing, ListingCategory } from "@/types";
 
@@ -22,8 +22,6 @@ export default function ListingsPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<ListingCategory | "all">("all");
-  const [query, setQuery] = useState("");
-
   const fetchListings = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -41,45 +39,24 @@ export default function ListingsPage() {
 
   useEffect(() => { fetchListings(); }, [fetchListings]);
 
-  const filtered = query.trim()
-    ? listings.filter((l) =>
-        l.title.toLowerCase().includes(query.toLowerCase()) ||
-        l.description?.toLowerCase().includes(query.toLowerCase())
-      )
-    : listings;
+  const filtered = listings;
 
   return (
-    <div className="min-h-screen bg-[#f7f7f5]">
+    <div className="min-h-screen">
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-neutral-200 px-4 py-16 sm:px-6 lg:px-8">
+      <div className="border-b border-[var(--border)] px-4 py-16 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">
           <p className="mb-3 text-[0.65rem] font-black uppercase tracking-[0.22em] text-neutral-400">
             Cooper Marketplace
           </p>
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h1 className="text-5xl font-black leading-none tracking-[-0.04em] text-neutral-900 sm:text-6xl">
-                Browse
-              </h1>
-              <p className="mt-3 max-w-md text-sm leading-relaxed text-neutral-500">
-                Prompts, research, datasets & AI images. Pay once with USDC — unlocks instantly.
-              </p>
-            </div>
-
-            {/* Search */}
-            <div className="flex w-full max-w-xs items-center gap-2.5 rounded-2xl border border-neutral-200
-                            bg-white px-4 py-3 focus-within:border-neutral-400
-                            transition-all shadow-sm focus-within:shadow-md">
-              <Search className="h-3.5 w-3.5 flex-shrink-0 text-neutral-400" />
-              <input
-                type="text"
-                placeholder="Search listings…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="flex-1 bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral-400"
-              />
-            </div>
+          <div>
+            <h1 className="text-5xl font-black leading-none tracking-[-0.04em] text-neutral-900 sm:text-6xl">
+              Browse
+            </h1>
+            <p className="mt-3 text-sm leading-relaxed text-neutral-500 whitespace-nowrap">
+              Prompts, research, datasets & AI images. Pay once with USDC — unlocks instantly.
+            </p>
           </div>
         </div>
       </div>
@@ -87,8 +64,8 @@ export default function ListingsPage() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
 
         {/* ── Filter pills ──────────────────────────────────────────────────── */}
-        <div className="sticky top-[68px] z-10 -mx-4 sm:-mx-6 lg:-mx-8 border-b border-neutral-200
-                        bg-[#f7f7f5]/95 backdrop-blur-xl px-4 sm:px-6 lg:px-8">
+        <div className="sticky top-[68px] z-10 -mx-4 sm:-mx-6 lg:-mx-8 border-b border-[var(--border)]
+                        bg-[var(--background)]/95 backdrop-blur-xl px-4 sm:px-6 lg:px-8">
           <div className="flex gap-2 overflow-x-auto py-3 scrollbar-hide">
             {CATEGORIES.map((cat) => {
               const active = activeCategory === cat.value;
@@ -117,7 +94,6 @@ export default function ListingsPage() {
           <p className="mt-6 mb-4 text-xs text-neutral-400">
             {filtered.length} listing{filtered.length !== 1 ? "s" : ""}
             {activeCategory !== "all" && ` · ${CATEGORIES.find((c) => c.value === activeCategory)?.label}`}
-            {query && ` · matching "${query}"`}
           </p>
         )}
 
@@ -129,7 +105,7 @@ export default function ListingsPage() {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <EmptyState category={activeCategory} hasQuery={!!query} />
+          <EmptyState category={activeCategory} hasQuery={false} />
         ) : (
           <div className="grid grid-cols-1 gap-6 pb-24 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((listing) => (

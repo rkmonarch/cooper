@@ -389,7 +389,10 @@ export default function CreatePage() {
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [form, setForm] = useState<FormState>(EMPTY);
+  const [form, setForm] = useState<FormState>({
+    ...EMPTY,
+    creatorName: session?.username ?? session?.displayName ?? "",
+  });
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -583,8 +586,11 @@ export default function CreatePage() {
                   </div>
                 </Field>
                 <Field label="Your display name">
-                  <TextInput required value={form.creatorName} onChange={(v) => set("creatorName", v)}
-                    placeholder="ResearchDAO, 0xAlpha…" />
+                  <input
+                    readOnly
+                    value={form.creatorName}
+                    className={`${inputCls} cursor-default opacity-70 select-none`}
+                  />
                 </Field>
               </Grid>
               <Field label="Preview image">
