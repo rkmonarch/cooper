@@ -316,6 +316,15 @@ function ResearchContent({ parsed, filename, allowDownload }: { parsed: Extract<
 // ── URL Viewer ────────────────────────────────────────────────────────────────
 // Embeds what it can; shows a styled fallback card for sites that block iframes.
 
+// Sites that are known to block iframes
+const IFRAME_BLOCKED = [
+  "medium.com", "substack.com", "twitter.com", "x.com", "github.com",
+  "theblock.co", "coindesk.com", "cointelegraph.com", "bloomberg.com",
+  "wsj.com", "nytimes.com", "ft.com", "techcrunch.com", "theverge.com",
+  "wired.com", "forbes.com", "reuters.com", "bbc.com", "bbc.co.uk",
+  "linkedin.com", "instagram.com", "facebook.com", "tiktok.com",
+];
+
 function getEmbedStrategy(url: string): { type: "embed"; src: string } | { type: "fallback" } {
   try {
     const u = new URL(url);
@@ -333,8 +342,8 @@ function getEmbedStrategy(url: string): { type: "embed"; src: string } | { type:
     if (/\.pdf($|\?)/i.test(u.pathname) || /\/pdf\b/i.test(url)) {
       return { type: "embed", src: `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true` };
     }
-    // Sites known to block iframes — show fallback
-    if (["medium.com", "substack.com", "twitter.com", "x.com", "github.com"].some((d) => host === d || host.endsWith(`.${d}`))) {
+    // Sites known to block iframes
+    if (IFRAME_BLOCKED.some((d) => host === d || host.endsWith(`.${d}`))) {
       return { type: "fallback" };
     }
     // Everything else: try iframe
@@ -353,6 +362,13 @@ function UrlViewer({ url }: { url: string }) {
 
   const faviconUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
 
+  // Auto-fallback: if iframe hasn't signalled a successful load within 6s, give up
+  useEffect(() => {
+    if (strategy.type !== "embed" || failed) return;
+    const timer = setTimeout(() => setFailed(true), 6000);
+    return () => clearTimeout(timer);
+  }, [strategy.type, failed]);
+
   if (strategy.type === "embed" && !failed) {
     return (
       <div className="overflow-hidden rounded-[1.75rem] border border-[var(--border)] shadow-sm">
@@ -361,6 +377,12 @@ function UrlViewer({ url }: { url: string }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={faviconUrl} alt="" className="h-4 w-4 rounded-sm" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
           <span className="flex-1 truncate font-mono text-xs text-[var(--muted)]">{url}</span>
+          <button
+            onClick={() => setFailed(true)}
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border)] bg-white px-2.5 py-1 text-xs font-semibold text-[var(--muted)] hover:text-[var(--foreground)] transition-colors mr-1"
+          >
+            Not loading?
+          </button>
           <a href={url} target="_blank" rel="noopener noreferrer"
             className="flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border)] bg-white px-2.5 py-1 text-xs font-semibold text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
             <ExternalLink className="h-3 w-3" />
@@ -373,11 +395,11 @@ function UrlViewer({ url }: { url: string }) {
           title="Content viewer"
           onError={() => setFailed(true)}
           onLoad={(e) => {
-            // Detect if page blocked the frame by checking if content loaded
+            // If cross-origin load succeeds, clear the timeout by marking loaded
             try {
               const doc = (e.target as HTMLIFrameElement).contentDocument;
               if (doc && doc.title === "") setFailed(true);
-            } catch { /* cross-origin — that's fine, it loaded */ }
+            } catch { /* cross-origin success — do nothing, timer will be cleared on unmount */ }
           }}
         />
       </div>
